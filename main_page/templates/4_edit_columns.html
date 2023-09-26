@@ -1,0 +1,19 @@
+{% extends "base.html" %} {% block content %}
+<div class="container">
+  <div class="mb-3">
+    <label for="formFile" class="form-label">Augšupielādē failu:</label>
+    <input class="form-control" type="file" id="formFile" />
+  </div>
+</div>
+<nav aria-label="Main navigation">
+  <ul class="pagination justify-content-center">
+    <li class="page-item">
+      <a class="page-link" href="edit_columns/">Iepriekšējā sadaļa</a>
+    </li>
+    
+    <li class="page-item">
+      <a class="page-link" href="download/">Nākamā sadaļa</a>
+    </li>
+  </ul>
+</nav>
+{% endblock content %}
