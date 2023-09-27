@@ -1,6 +1,11 @@
-.navbar-brand {
-  color: darkgreen;
+.full-height {
+  min-height: calc(100vh - 110px);
+  max-height: calc(100vh - 110px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
-h1 {
-  color: darkgreen;
+
+.stretch-to-bottom {
+  flex: 1;
 }
