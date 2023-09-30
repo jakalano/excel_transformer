@@ -1,27 +1,20 @@
 import os
-import csv
 import pandas as pd
+from datetime import datetime
 from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from django.template import loader
 # from .models import UploadedFile
+from .utils import load_dataframe_from_file
 from .forms import UploadFileForm, ParagraphErrorList
 
-def detect_delimiter(file_path, num_lines=5):
-    # detect the delimiter of a csv file
-    with open(file_path, 'r', encoding='utf-8', errors='ignore') as file:
-        # read the first few lines of the file
-        lines = [file.readline().strip() for _ in range(num_lines)]
-        sniffer = csv.Sniffer()
-        delimiter = sniffer.sniff(''.join(lines)).delimiter
-    return delimiter
+
 
 def main_page(request):
     context = {
         'previous_page_url': None,  # to disable pagination
         'next_page_url': 'summary'
     }
-
     if request.method == 'POST':
         form = UploadFileForm(request.POST, request.FILES, error_class=ParagraphErrorList)
 
@@ -30,20 +23,12 @@ def main_page(request):
             
             # Determine the file type based on extension
             file_path = uploaded_file.file.path
-            file_extension = os.path.splitext(file_path)[1].lower()
-
-            if file_extension == '.csv':
-                delimiter = detect_delimiter(file_path)
-                print(delimiter) # for debugging
-                df_orig = pd.read_csv(file_path, delimiter=delimiter)
-            elif file_extension in ['.xlsx', '.xls']:
-                df_orig = pd.read_excel(file_path)
-            # For example, print the first 5 rows
-            print(df_orig.head())
+            df_orig = load_dataframe_from_file(file_path)
             # save table and add to session
             html_table = df_orig.to_html(classes='table table-striped')
             request.session['html_table'] = html_table
             request.session['file_path'] = file_path
+            print(file_path)
             return redirect('summary')
         else:
             context['form'] = form  # Add the invalid form to the context so errors can be displayed
@@ -51,21 +36,16 @@ def main_page(request):
 
     form = UploadFileForm()
     context['form'] = form
+    
     return render(request, '1_index.html', context)
 
 def summary(request):
     file_path = request.session.get('file_path')
-    file_extension = os.path.splitext(file_path)[1].lower()
-
-    if file_extension == '.csv':
-        delimiter = detect_delimiter(file_path)
-        print(delimiter) # for debugging
-        df_orig = pd.read_csv(file_path, delimiter=delimiter)
-    elif file_extension in ['.xlsx', '.xls']:
-        df_orig = pd.read_excel(file_path)
+    df_orig = load_dataframe_from_file(file_path)
     num_rows = df_orig.shape[0]
     num_cols = df_orig.shape[1]
     col_names = df_orig.columns.tolist()
+    print(col_names)
     context = {
         
         'num_rows': num_rows,
@@ -75,8 +55,8 @@ def summary(request):
         'previous_page_url': 'main_page',
         'next_page_url': 'edit_data'   
     }
-    template = loader.get_template('2_file_summary.html')
-    return HttpResponse(template.render(context, request))
+    
+    return render(request, '2_file_summary.html', context)
 
 def edit_data(request):
     
@@ -86,24 +66,73 @@ def edit_data(request):
         
     }
     context['table'] = request.session.get('html_table', '')
-    template = loader.get_template('3_edit_data.html')
-    return HttpResponse(template.render(context, request))
+    return render(request, '3_edit_data.html', context)
 
 def edit_columns(request):
     context = {
         'previous_page_url': 'edit_data',
         'next_page_url': 'download'  
     }
-    template = loader.get_template('4_edit_columns.html')
-    return HttpResponse(template.render(context, request))
+    return render(request, '4_edit_columns.html', context)
 
 def download(request):
     context = {
         'previous_page_url': 'edit_columns',
         'next_page_url': None  # to disable pagination
     }
-    template = loader.get_template('5_download.html')
-    return HttpResponse(template.render(context, request))
+
+    file_format = request.GET.get('format')
+    print(f"File format: {file_format}")
+    # If a format is specified, handle file download
+    if file_format:
+        file_path = request.session.get('file_path', 'data')  # default to 'data'
+        original_file_name = os.path.basename(file_path)
+        original_file_dir = os.path.dirname(file_path)  # get the directory of the original file
+        
+        print(f"Original file name: {original_file_name}")
+        df = load_dataframe_from_file(file_path)
+        print(df.head())
+        file_name_no_ext, _ = os.path.splitext(original_file_name)
+
+        # Generate the new filename
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        new_file_name = f"{file_name_no_ext}_EDITED_{timestamp}"
+        print(f"New file name: {new_file_name}")
+        save_path = os.path.join(original_file_dir, f"{new_file_name}.{file_format}")  # save in the original file's directory
+
+        if file_format == 'csv':
+            df.to_csv(save_path, index=False)
+            with open(save_path, 'rb') as f:
+                response = HttpResponse(f, content_type='text/csv')
+            response['Content-Disposition'] = f'attachment; filename="{new_file_name}.csv"'
+        elif file_format == 'xlsx':
+            df.to_excel(save_path, index=False, engine='openpyxl')
+            with open(save_path, 'rb') as f:
+                response = HttpResponse(f, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            response['Content-Disposition'] = f'attachment; filename="{new_file_name}.xlsx"'
+                
+
+        elif file_format == 'json':
+            df.to_json(save_path, index=False)
+            with open(save_path, 'rb') as f:
+                response = HttpResponse(f, content_type='application/json')
+            response['Content-Disposition'] = f'attachment; filename="{new_file_name}.json"'
+            
+        elif file_format == 'xml':
+            df.to_xml(save_path, index=False)
+            with open(save_path, 'rb') as f:
+                response = HttpResponse(f, content_type='application/xml')
+            response['Content-Disposition'] = f'attachment; filename="{new_file_name}.xml"'
+            
+        else:
+            # Handle unexpected format
+            return HttpResponse("Unexpected format", status=400)
+
+        return response
+    else:
+        # If no format is specified, render the HTML page
+        return render(request, '5_download.html', context)
+
 
 
 

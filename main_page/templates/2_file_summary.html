@@ -8,14 +8,14 @@
               <h5 class="card-title">File Details</h5>
               <p class="card-text">Number of Columns: {{ num_cols }}</p>
               <div class="dropdown">
-                  <button class="btn btn-secondary dropdown-toggle" type="button" id="columnDropdown" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                  <button class="btn btn-secondary dropdown-toggle" type="button" id="columnDropdown" data-bs-toggle="dropdown"  aria-expanded="false">
                       Column Names
                   </button>
-                  <div class="dropdown-menu" aria-labelledby="columnDropdown">
+                  <ul div class="dropdown-menu">
                       {% for name in col_names %}
-                          <a class="dropdown-item">{{ name }}</a>
+                          <li><a class="dropdown-item">{{ name|slice:":50" }}{% if name|length > 50 %}...{% endif %}</a></li>
                       {% endfor %}
-                  </div>
+                  </ul>
               </div>
           </div>
       </div>
