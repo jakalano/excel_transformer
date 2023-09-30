@@ -160,6 +160,6 @@ cython_debug/
 #.idea/
 
 # file uploads
-media/
+media/*
 # exception to the rule to create the necessary folders
 !media/.gitkeep 
