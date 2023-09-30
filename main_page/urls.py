@@ -8,6 +8,6 @@ urlpatterns = [
     path('edit_data/', views.edit_data, name='edit_data'),
     path('edit_columns/', views.edit_columns, name='edit_columns'),
     path('download/', views.download, name='download'),
-    path('failed/', views.failed, name='failed'),
+    # path('failed/', views.failed, name='failed'),
 ]
 

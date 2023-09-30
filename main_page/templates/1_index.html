@@ -3,9 +3,14 @@
 <form method="post" enctype="multipart/form-data" action="{% url 'main_page' %}">
   {% csrf_token %}
   <label for="formFile" class="form-label">Augšupielādē failu:</label>
-  <input class="form-control" type="file" id="formFile" name="file" />
-  <button type="submit">Upload</button>
+  {{ form.as_p }}
+    
+    <button type="submit">Upload</button>
+    
+
 </form>
+
+
 
 
 <h1>HTML Ipsum Presents</h1>
