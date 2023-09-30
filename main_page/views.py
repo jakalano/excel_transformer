@@ -27,6 +27,7 @@ def main_page(request):
 
         if form.is_valid():
             uploaded_file = form.save()  # Save the file and get an instance
+            
             # Determine the file type based on extension
             file_path = uploaded_file.file.path
             file_extension = os.path.splitext(file_path)[1].lower()
@@ -39,7 +40,10 @@ def main_page(request):
                 df_orig = pd.read_excel(file_path)
             # For example, print the first 5 rows
             print(df_orig.head())
-
+            # save table and add to session
+            html_table = df_orig.to_html(classes='table table-striped')
+            request.session['html_table'] = html_table
+            request.session['file_path'] = file_path
             return redirect('summary')
         else:
             context['form'] = form  # Add the invalid form to the context so errors can be displayed
@@ -50,7 +54,23 @@ def main_page(request):
     return render(request, '1_index.html', context)
 
 def summary(request):
+    file_path = request.session.get('file_path')
+    file_extension = os.path.splitext(file_path)[1].lower()
+
+    if file_extension == '.csv':
+        delimiter = detect_delimiter(file_path)
+        print(delimiter) # for debugging
+        df_orig = pd.read_csv(file_path, delimiter=delimiter)
+    elif file_extension in ['.xlsx', '.xls']:
+        df_orig = pd.read_excel(file_path)
+    num_rows = df_orig.shape[0]
+    num_cols = df_orig.shape[1]
+    col_names = df_orig.columns.tolist()
     context = {
+        
+        'num_rows': num_rows,
+        'num_cols': num_cols,
+        'col_names': col_names,
 
         'previous_page_url': 'main_page',
         'next_page_url': 'edit_data'   
@@ -59,10 +79,13 @@ def summary(request):
     return HttpResponse(template.render(context, request))
 
 def edit_data(request):
+    
     context = {
         'previous_page_url': 'summary',
-        'next_page_url': 'edit_columns'    
+        'next_page_url': 'edit_columns',
+        
     }
+    context['table'] = request.session.get('html_table', '')
     template = loader.get_template('3_edit_data.html')
     return HttpResponse(template.render(context, request))
 
