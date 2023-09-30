@@ -9,3 +9,10 @@
 .stretch-to-bottom {
   flex: 1;
 }
+
+.scrollable-table {
+  max-height: 700px; /* adjust this value according to your needs */
+  overflow-x: auto;  /* horizontal scroll if necessary */
+  overflow-y: auto;  /* vertical scroll if necessary */
+  display: block;
+}

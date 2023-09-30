@@ -17,3 +17,4 @@ pip freeze > requirements.txt
 # error log to fix
 - fix csv ingestion issues with different delimiters
 - remove empty NaN rows
+- move the save dataframe function from views to utils

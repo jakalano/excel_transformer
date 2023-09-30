@@ -2,11 +2,13 @@ import os
 import pandas as pd
 from datetime import datetime
 from django.shortcuts import render, redirect
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 from django.template import loader
 # from .models import UploadedFile
-from .utils import load_dataframe_from_file
+from .utils import load_dataframe_from_file, save_dataframe_to_file
 from .forms import UploadFileForm, ParagraphErrorList
+
 
 
 
@@ -30,6 +32,7 @@ def main_page(request):
             request.session['file_path'] = file_path
             print(file_path)
             return redirect('summary')
+            
         else:
             context['form'] = form  # Add the invalid form to the context so errors can be displayed
             return render(request, '1_index.html', context)
@@ -42,25 +45,32 @@ def main_page(request):
 def summary(request):
     file_path = request.session.get('file_path')
     df_orig = load_dataframe_from_file(file_path)
+    
+    if request.method == 'POST' and 'remove_empty_rows' in request.POST:
+        df_orig.dropna(how='all', inplace=True)
+        save_dataframe_to_file(df_orig, file_path)
+        return redirect('edit_data')
+
     num_rows = df_orig.shape[0]
     num_cols = df_orig.shape[1]
     col_names = df_orig.columns.tolist()
-    print(col_names)
+    num_empty_rows = df_orig[df_orig.isna().all(axis=1)].shape[0]
+    
     context = {
-        
         'num_rows': num_rows,
         'num_cols': num_cols,
         'col_names': col_names,
-
+        'num_empty_rows': num_empty_rows,
         'previous_page_url': 'main_page',
-        'next_page_url': 'edit_data'   
+        'next_page_url': 'edit_data',
     }
     
     return render(request, '2_file_summary.html', context)
 
 def edit_data(request):
-    
+    num_empty_rows = request.session.get('num_empty_rows', 0)
     context = {
+        'num_empty_rows': num_empty_rows,
         'previous_page_url': 'summary',
         'next_page_url': 'edit_columns',
         
@@ -135,6 +145,14 @@ def download(request):
 
 
 
+@csrf_exempt
+def delete_empty_rows(request):
+    file_path = request.session.get('file_path')
+    df = load_dataframe_from_file(file_path)
+    df_cleaned1 = df.dropna(how='all')
+    # Save the cleaned dataframe back
+    save_dataframe_to_file(df_cleaned1, file_path)
+    return JsonResponse({'status': 'success'})
 
 
 #def upload(request):

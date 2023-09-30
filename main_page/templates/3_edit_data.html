@@ -1,6 +1,8 @@
-{% extends "base.html" %} {% block content %}
+{% extends "base.html" %} 
+{% block content %}
 <div class="container">
-  {{ table|safe }}
+    <div class="scrollable-table">
+        {{ table|safe }}
+    </div>
 </div>
-
 {% endblock content %}

@@ -22,7 +22,7 @@
     <title>Excel failu pārveidotājs</title>
   </head>
   <body>
-    <nav class="navbar sticky-top navbar-expand-lg bg-body-tertiary">
+    <nav class="navbar sticky-top navbar-expand bg-body-tertiary">
       <div class="container-fluid">
         <a class="navbar-brand" href="/">Excel failu pārveidotājs</a>
         <button
@@ -44,13 +44,13 @@
               >
             </li>
             <li class="nav-item">
-              <a class="nav-link" href="/">Labot datus</a>
+              <a class="nav-link" href="{% url 'edit_data' %}">Labot datus</a>
             </li>
             <li class="nav-item">
-              <a class="nav-link" href="#">Labot kolonnas</a>
+              <a class="nav-link" href="{% url 'edit_columns' %}">Labot kolonnas</a>
             </li>
             <li class="nav-item">
-              <a class="nav-link" href="#">Lejupielādēt</a>
+              <a class="nav-link" href="{% url 'download' %}">Lejupielādēt</a>
             </li>
             <li class="nav-item dropdown">
               <a
@@ -89,10 +89,13 @@
               </li>
 
               <li class="page-item {% if next_page_url == None %}disabled{% endif %}">
-                <a class="page-link" href="{% if next_page_url != None %}{% url  next_page_url %}{% endif %}">Nākamā sadaļa</a>
+                <!-- This button submits the form -->
+                <button type="submit" class="page-link">Nākamā sadaļa</button>
               </li>
             </ul>
           </nav>
+</form>
+
         
     </div>
     <!-- Optional JavaScript -->
@@ -107,5 +110,6 @@
       integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r"
       crossorigin="anonymous"
     ></script>
+    <script src="{% static 'js/main.js' %}"></script>
   </body>
 </html>
