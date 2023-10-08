@@ -1,13 +1,16 @@
 {% extends "base.html" %} {% block content %}
 <div class="container">
   <form action="{% url 'download' %}" method="get">
+    <!-- <label for="enforce_utf8">Enforce UTF-8 Encoding:</label>
+    <input type="checkbox" id="enforce_utf8" name="enforce_utf8" checked>
+    <br><br> -->
     <label for="format">Choose a format:</label>
     <select name="format" id="format">
         <option value="csv">CSV</option>
         <option value="xlsx">XLSX</option>
         <option value="json">JSON</option>
         <option value="xml">XML</option>
-    </select>
+    </select><br><br>
     <input type="submit" value="Download">
 </form>
 

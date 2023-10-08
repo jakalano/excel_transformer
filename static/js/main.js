@@ -5,21 +5,22 @@ function handleSummaryPageActions() {
         console.log("Summary page");
         let nextPageLink = document.querySelector('.page-link[href="/edit_data/"]');
         let removeRowsCheckbox = document.getElementById('removeRowsCheckbox');
+        let removeColsCheckbox = document.getElementById('removeColsCheckbox');
         let removeEmptyRowsForm = document.getElementById('removeEmptyRowsForm');
-        if (removeRowsCheckbox) {
+        if (removeRowsCheckbox || removeColsCheckbox) {
             console.log("checkbox")
             if (nextPageLink) {
-                console.log("Next page link found", nextPageLink);  // Additional log
+                console.log("Next page link found", nextPageLink);
                 nextPageLink.addEventListener('click', function(event) {
                     console.log("Next page link clicked");
-                    if (removeRowsCheckbox.checked) {
+                    if (removeRowsCheckbox.checked || removeColsCheckbox.checked) {
                         event.preventDefault();
                         console.log("Checkbox is checked, submitting form");
                         removeEmptyRowsForm.submit();
                     }
                 });
             } else {
-                console.log("Next page link NOT found");  // Additional log
+                console.log("Next page link NOT found");
             }
             }
     }

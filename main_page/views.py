@@ -8,7 +8,7 @@ from django.template import loader
 # from .models import UploadedFile
 from .utils import (
     load_dataframe_from_file, save_dataframe,
-    dataframe_to_html, remove_empty_rows_from_dataframe
+    dataframe_to_html, remove_empty_rows
 )
 from .forms import UploadFileForm, ParagraphErrorList
 
@@ -30,7 +30,7 @@ def main_page(request):
             file_path = uploaded_file.file.path
             df_orig = load_dataframe_from_file(file_path)
             # save table and add to session
-            html_table = df_orig.to_html(classes='table table-striped')
+            html_table = dataframe_to_html(df_orig,classes='table table-striped')
             request.session['html_table'] = html_table
             request.session['file_path'] = file_path
             print(file_path)
@@ -47,19 +47,32 @@ def main_page(request):
 
 def summary(request):
     file_path = request.session.get('file_path')
-    df_orig = load_dataframe_from_file(file_path)
+    df_v1 = load_dataframe_from_file(file_path)
+    # Identify empty columns
+    empty_cols = df_v1.columns[df_v1.isna().all()].tolist()
 
-    if request.method == 'POST' and 'remove_empty_rows' in request.POST:
-        print("Removing empty rows")
-        df_orig = remove_empty_rows_from_dataframe(df_orig)
-        print(f"DataFrame shape after drop: {df_orig.shape}")
-        save_dataframe(df_orig, file_path)
+    if request.method == 'POST':
+        if 'remove_empty_rows' in request.POST:
+            print("Removing empty rows")
+            df_v1 = remove_empty_rows(df_v1)
+            print(f"DataFrame shape after drop rows: {df_v1.shape}")
+            save_dataframe(df_v1, file_path)
+        
+        # Get selected columns to delete from POST data
+        cols_to_delete = request.POST.getlist('remove_empty_cols')
+        # Delete selected columns
+        df_v1 = df_v1.drop(columns=cols_to_delete)
+        save_dataframe(df_v1, file_path)
+        # Redirect to avoid resubmit on refresh
+        return redirect('summary')
 
     context = {
-        'num_rows': df_orig.shape[0],
-        'num_cols': df_orig.shape[1],
-        'col_names': df_orig.columns.tolist(),
-        'num_empty_rows': df_orig[df_orig.isna().all(axis=1)].shape[0],
+        'num_rows': df_v1.shape[0],
+        'num_cols': df_v1.shape[1],
+        'col_names': df_v1.columns.tolist(),
+        'num_empty_rows': df_v1[df_v1.isna().all(axis=1)].shape[0],
+        'num_empty_cols': df_v1.columns[df_v1.isna().all(axis=0)].size,
+        'empty_cols': empty_cols,
         'previous_page_url': 'main_page',
         'next_page_url': 'edit_data',
     }
@@ -72,6 +85,7 @@ def edit_data(request):
     
     context = {
         'num_empty_rows': df[df.isna().all(axis=1)].shape[0],
+        'num_empty_cols': df.columns[df.isna().all(axis=0)].size,
         'previous_page_url': 'summary',
         'next_page_url': 'edit_columns',
         'table': dataframe_to_html(df, classes='table table-striped'),
@@ -126,7 +140,7 @@ def download(request):
             else:
                 # Handle unexpected format
                 return HttpResponse("Unexpected format", status=400)
-            
+                
         response['Content-Disposition'] = f'attachment; filename="{new_file_name}.{file_format}"'
         return response
     else:
@@ -135,21 +149,5 @@ def download(request):
 
 
 
-@csrf_exempt
-def delete_empty_rows(request):
-    file_path = request.session.get('file_path')
-    df = load_dataframe_from_file(file_path)
-    df_cleaned = remove_empty_rows_from_dataframe(df)
-    save_dataframe(df_cleaned, file_path)
-    return JsonResponse({'status': 'success'})
 
-
-#def upload(request):
-
-# def failed(request):
-#     context = {
-#         'previous_page_url': 'main_page',  
-#         'next_page_url': None 
-#     }
-#     template = loader.get_template('failed.html')
-#     return HttpResponse(template.render(context, request)) 
+ 

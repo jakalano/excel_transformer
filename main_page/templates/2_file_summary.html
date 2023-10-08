@@ -29,13 +29,26 @@
               <p class="card-text">Number of Rows: {{ num_rows }}</p>
           </div>
       </div>
-  </div>
+  </div><br><br>
 <div>
-<form id="removeEmptyRowsForm" action="{% url 'summary' %}" method="post">
+<form id="removeEmptyForm" action="{% url 'summary' %}" method="post">
   {% csrf_token %}
   {% if num_empty_rows > 0 %}
-      <input type="checkbox" name="remove_empty_rows" id="removeRowsCheckbox"> There are {{ num_empty_rows }} empty rows. Delete them?
-  {% endif %}
+  <label for="removeRowsCheckbox">There are {{ num_empty_rows }} empty rows. Delete them? </label>
+      <input type="checkbox" name="remove_empty_rows" id="removeRowsCheckbox"> 
+  <br><br>{% endif %}
+
+{% if empty_cols %}
+    
+    <label>There are {{ num_empty_cols }} empty columns. Select to delete: </label><br>
+    {% for col in empty_cols %}
+        <input type="checkbox" name="remove_empty_cols" value="{{ col }}"> {{ col }}<br>
+    {% endfor %}
+    
+{% endif %}
+{% if num_empty_cols > 0 or num_empty_rows > 0 %}
+<button type="submit">Submit</button>
+{% endif %}
 </form>
 </div>
 </div>
