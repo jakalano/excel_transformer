@@ -25,22 +25,35 @@ def load_dataframe_from_file(file_path):
     else:
         raise ValueError("Unsupported file type: {}".format(file_extension))
     
-def save_dataframe_to_file(df, file_path):
+def save_dataframe(df, save_path, file_format=None):
     """
-    Save a pandas DataFrame to a file based on its extension.
-    """
-    _, ext = os.path.splitext(file_path)
-    ext = ext.lower()
-    
-    if ext == '.csv':
-        df.to_csv(file_path, index=False)
-    elif ext in ['.xlsx', '.xls']:
-        df.to_excel(file_path, index=False, engine='openpyxl')
-    elif ext == '.json':
-        df.to_json(file_path)
-    elif ext == '.xml':
-        df.to_xml(file_path)
-    else:
-        raise ValueError(f"Unsupported file extension: {ext}")
+    Save a DataFrame to a file, optionally in a user-specified format.
 
-    return file_path
+    :param df: DataFrame to save
+    :param save_path: Path to save the file
+    :param file_format: Format to save the file in (optional, if None, infer from save_path)
+    """
+    if file_format is None:
+        _, file_format = os.path.splitext(save_path)
+        file_format = file_format.lstrip(".")
+    
+    if file_format == 'csv':
+        df.to_csv(save_path, index=False)
+    elif file_format == 'xlsx':
+        df.to_excel(save_path, index=False, engine='openpyxl')
+    elif file_format == 'json':
+        df.to_json(save_path, index=False)
+    elif file_format == 'xml':
+        df.to_xml(save_path, index=False)
+    else:
+        raise ValueError(f"Unsupported file format: {file_format}")
+
+    return save_path
+
+def dataframe_to_html(df, classes=None):
+    """Convert a DataFrame to an HTML table."""
+    return df.to_html(classes=classes)
+
+def remove_empty_rows_from_dataframe(df):
+    """Remove all rows from a DataFrame that contain only NaN values."""
+    return df.dropna(how='all')

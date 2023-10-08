@@ -6,7 +6,10 @@ from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.template import loader
 # from .models import UploadedFile
-from .utils import load_dataframe_from_file, save_dataframe_to_file
+from .utils import (
+    load_dataframe_from_file, save_dataframe,
+    dataframe_to_html, remove_empty_rows_from_dataframe
+)
 from .forms import UploadFileForm, ParagraphErrorList
 
 
@@ -45,22 +48,18 @@ def main_page(request):
 def summary(request):
     file_path = request.session.get('file_path')
     df_orig = load_dataframe_from_file(file_path)
-    
-    if request.method == 'POST' and 'remove_empty_rows' in request.POST:
-        df_orig.dropna(how='all', inplace=True)
-        save_dataframe_to_file(df_orig, file_path)
-        return redirect('edit_data')
 
-    num_rows = df_orig.shape[0]
-    num_cols = df_orig.shape[1]
-    col_names = df_orig.columns.tolist()
-    num_empty_rows = df_orig[df_orig.isna().all(axis=1)].shape[0]
-    
+    if request.method == 'POST' and 'remove_empty_rows' in request.POST:
+        print("Removing empty rows")
+        df_orig = remove_empty_rows_from_dataframe(df_orig)
+        print(f"DataFrame shape after drop: {df_orig.shape}")
+        save_dataframe(df_orig, file_path)
+
     context = {
-        'num_rows': num_rows,
-        'num_cols': num_cols,
-        'col_names': col_names,
-        'num_empty_rows': num_empty_rows,
+        'num_rows': df_orig.shape[0],
+        'num_cols': df_orig.shape[1],
+        'col_names': df_orig.columns.tolist(),
+        'num_empty_rows': df_orig[df_orig.isna().all(axis=1)].shape[0],
         'previous_page_url': 'main_page',
         'next_page_url': 'edit_data',
     }
@@ -68,15 +67,18 @@ def summary(request):
     return render(request, '2_file_summary.html', context)
 
 def edit_data(request):
-    num_empty_rows = request.session.get('num_empty_rows', 0)
+    file_path = request.session.get('file_path')
+    df = load_dataframe_from_file(file_path)
+    
     context = {
-        'num_empty_rows': num_empty_rows,
+        'num_empty_rows': df[df.isna().all(axis=1)].shape[0],
         'previous_page_url': 'summary',
         'next_page_url': 'edit_columns',
-        
+        'table': dataframe_to_html(df, classes='table table-striped'),
     }
-    context['table'] = request.session.get('html_table', '')
+    
     return render(request, '3_edit_data.html', context)
+
 
 def edit_columns(request):
     context = {
@@ -93,7 +95,7 @@ def download(request):
 
     file_format = request.GET.get('format')
     print(f"File format: {file_format}")
-    # If a format is specified, handle file download
+    
     if file_format:
         file_path = request.session.get('file_path', 'data')  # default to 'data'
         original_file_name = os.path.basename(file_path)
@@ -109,35 +111,23 @@ def download(request):
         new_file_name = f"{file_name_no_ext}_EDITED_{timestamp}"
         print(f"New file name: {new_file_name}")
         save_path = os.path.join(original_file_dir, f"{new_file_name}.{file_format}")  # save in the original file's directory
+        save_dataframe(df, save_path, file_format)
 
-        if file_format == 'csv':
-            df.to_csv(save_path, index=False)
-            with open(save_path, 'rb') as f:
+        with open(save_path, 'rb') as f:
+            if file_format == 'csv':
                 response = HttpResponse(f, content_type='text/csv')
-            response['Content-Disposition'] = f'attachment; filename="{new_file_name}.csv"'
-        elif file_format == 'xlsx':
-            df.to_excel(save_path, index=False, engine='openpyxl')
-            with open(save_path, 'rb') as f:
+            elif file_format == 'xlsx':
                 response = HttpResponse(f, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-            response['Content-Disposition'] = f'attachment; filename="{new_file_name}.xlsx"'
-                
-
-        elif file_format == 'json':
-            df.to_json(save_path, index=False)
-            with open(save_path, 'rb') as f:
+            elif file_format == 'json':
                 response = HttpResponse(f, content_type='application/json')
-            response['Content-Disposition'] = f'attachment; filename="{new_file_name}.json"'
-            
-        elif file_format == 'xml':
-            df.to_xml(save_path, index=False)
-            with open(save_path, 'rb') as f:
+            elif file_format == 'xml':
                 response = HttpResponse(f, content_type='application/xml')
-            response['Content-Disposition'] = f'attachment; filename="{new_file_name}.xml"'
+        
+            else:
+                # Handle unexpected format
+                return HttpResponse("Unexpected format", status=400)
             
-        else:
-            # Handle unexpected format
-            return HttpResponse("Unexpected format", status=400)
-
+        response['Content-Disposition'] = f'attachment; filename="{new_file_name}.{file_format}"'
         return response
     else:
         # If no format is specified, render the HTML page
@@ -149,9 +139,8 @@ def download(request):
 def delete_empty_rows(request):
     file_path = request.session.get('file_path')
     df = load_dataframe_from_file(file_path)
-    df_cleaned1 = df.dropna(how='all')
-    # Save the cleaned dataframe back
-    save_dataframe_to_file(df_cleaned1, file_path)
+    df_cleaned = remove_empty_rows_from_dataframe(df)
+    save_dataframe(df_cleaned, file_path)
     return JsonResponse({'status': 'success'})
 
 

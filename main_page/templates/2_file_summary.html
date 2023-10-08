@@ -30,14 +30,13 @@
           </div>
       </div>
   </div>
-</div>
-
-<form id="removeEmptyRowsForm" action="{% url 'summary' %}" method="post" style="display: none;">
+<div>
+<form id="removeEmptyRowsForm" action="{% url 'summary' %}" method="post">
   {% csrf_token %}
   {% if num_empty_rows > 0 %}
-      <input type="checkbox" name="remove_empty_rows" id="removeRowsCheckbox"> 
+      <input type="checkbox" name="remove_empty_rows" id="removeRowsCheckbox"> There are {{ num_empty_rows }} empty rows. Delete them?
   {% endif %}
 </form>
-
-
+</div>
+</div>
 {% endblock content %}

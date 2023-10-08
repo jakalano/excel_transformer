@@ -90,7 +90,7 @@
 
               <li class="page-item {% if next_page_url == None %}disabled{% endif %}">
                 <!-- This button submits the form -->
-                <button type="submit" class="page-link">Nākamā sadaļa</button>
+                <a type="submit" class="page-link" href="{% if next_page_url != None %}{% url next_page_url %}{% endif %}">Nākamā sadaļa</a>
               </li>
             </ul>
           </nav>
@@ -110,6 +110,6 @@
       integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r"
       crossorigin="anonymous"
     ></script>
-    <script src="{% static 'js/main.js' %}"></script>
+    <script src="{% static 'js/main.js' %}" type="text/javascript"></script>
   </body>
 </html>
