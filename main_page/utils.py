@@ -17,7 +17,7 @@ def load_dataframe_from_file(file_path):
     if file_extension == '.csv':
         delimiter = detect_delimiter(file_path)
         print(delimiter)  # for debugging
-        return pd.read_csv(file_path, delimiter=delimiter, encoding = 'utf8')
+        return pd.read_csv(file_path, delimiter=delimiter, encoding = 'utf8', dtype=str)
     
     elif file_extension in ['.xlsx', '.xls']:
         return pd.read_excel(file_path, encoding = 'utf8')
@@ -52,7 +52,10 @@ def save_dataframe(df, save_path, file_format=None):
 
 def dataframe_to_html(df, classes=None):
     """Convert a DataFrame to an HTML table."""
-    return df.to_html(classes=classes)
+    df.columns = [f"{col}<br>({str(dtype)})" for col, dtype in zip(df.columns, df.dtypes)]
+    
+    # Convert NaN values to an empty string and convert DataFrame to HTML
+    return df.fillna('').to_html(classes=classes, escape=False)
 
 def remove_empty_rows(df):
     """Remove all rows from a DataFrame that contain only NaN values."""

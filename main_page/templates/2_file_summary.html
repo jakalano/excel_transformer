@@ -1,5 +1,7 @@
 {% extends "base.html" %} 
 
+
+
 {% block content %}
 
 <h1>file name</h1>
@@ -52,4 +54,8 @@
 </form>
 </div>
 </div>
+<div class="container">
+<div class="scrollable-table" id="summary-table">
+    {{ table|safe }}
+</div></div>
 {% endblock content %}

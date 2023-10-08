@@ -29,7 +29,6 @@ def main_page(request):
             # Determine the file type based on extension
             file_path = uploaded_file.file.path
             df_orig = load_dataframe_from_file(file_path)
-            # save table and add to session
             html_table = dataframe_to_html(df_orig,classes='table table-striped')
             request.session['html_table'] = html_table
             request.session['file_path'] = file_path
@@ -73,6 +72,7 @@ def summary(request):
         'num_empty_rows': df_v1[df_v1.isna().all(axis=1)].shape[0],
         'num_empty_cols': df_v1.columns[df_v1.isna().all(axis=0)].size,
         'empty_cols': empty_cols,
+        'table': dataframe_to_html(df_v1, classes='table table-striped'),
         'previous_page_url': 'main_page',
         'next_page_url': 'edit_data',
     }
