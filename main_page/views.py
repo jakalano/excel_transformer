@@ -3,7 +3,6 @@ import pandas as pd
 from datetime import datetime
 from django.shortcuts import render, redirect
 from django.http import HttpResponse, JsonResponse
-from django.views.decorators.csrf import csrf_exempt
 from django.template import loader
 # from .models import UploadedFile
 from .utils import (
@@ -52,15 +51,38 @@ def summary(request):
 
     if request.method == 'POST':
         if 'remove_empty_rows' in request.POST:
-            print("Removing empty rows")
+            # print("Removing empty rows")
             df_v1 = remove_empty_rows(df_v1)
-            print(f"DataFrame shape after drop rows: {df_v1.shape}")
+            # print(f"DataFrame shape after drop rows: {df_v1.shape}")
             save_dataframe(df_v1, file_path)
         
         # Get selected columns to delete from POST data
         cols_to_delete = request.POST.getlist('remove_empty_cols')
         # Delete selected columns
         df_v1 = df_v1.drop(columns=cols_to_delete)
+
+        num_rows_to_delete_start = request.POST.get('num_rows_to_delete_start')
+        replace_header = 'replace_header' in request.POST
+        num_rows_to_delete_end = request.POST.get('num_rows_to_delete_end')
+
+        # Check if num_rows_to_delete_start is not None and convert to int, else default to 0
+        num_rows_to_delete_start = int(num_rows_to_delete_start) if num_rows_to_delete_start else 0
+
+        # Logic to delete the first X rows and possibly replace the header
+        df_v1 = df_v1.iloc[num_rows_to_delete_start:]
+        
+        # If replace_header is True, set the dataframe columns to the first row's values
+        if replace_header:
+            df_v1.columns = df_v1.iloc[0]
+            df_v1 = df_v1.iloc[1:]
+
+        # Check if num_rows_to_delete_end is not None and convert to int, else default to 0
+        num_rows_to_delete_end = int(num_rows_to_delete_end) if num_rows_to_delete_end else 0
+        
+        # Logic to delete the last X rows
+        if num_rows_to_delete_end > 0:
+            df_v1 = df_v1.iloc[:-num_rows_to_delete_end]
+        
         save_dataframe(df_v1, file_path)
         # Redirect to avoid resubmit on refresh
         return redirect('summary')
@@ -73,45 +95,54 @@ def summary(request):
         'num_empty_cols': df_v1.columns[df_v1.isna().all(axis=0)].size,
         'empty_cols': empty_cols,
         'table': dataframe_to_html(df_v1, classes='table table-striped'),
+        'original_file_name': os.path.basename(file_path),
         'previous_page_url': 'main_page',
-        'next_page_url': 'edit_data',
+        'next_page_url': 'edit_columns',
     }
     
     return render(request, '2_file_summary.html', context)
+
+def edit_columns(request):
+    file_path = request.session.get('file_path')
+    df = load_dataframe_from_file(file_path)
+    context = {
+        'previous_page_url': 'summary',
+        'next_page_url': 'edit_data',
+        'table': dataframe_to_html(df, classes='table table-striped'),
+        'original_file_name': os.path.basename(file_path),
+    }
+    return render(request, '3_edit_columns.html', context)
 
 def edit_data(request):
     file_path = request.session.get('file_path')
     df = load_dataframe_from_file(file_path)
     
     context = {
-        'num_empty_rows': df[df.isna().all(axis=1)].shape[0],
-        'num_empty_cols': df.columns[df.isna().all(axis=0)].size,
-        'previous_page_url': 'summary',
-        'next_page_url': 'edit_columns',
+        # 'num_empty_rows': df[df.isna().all(axis=1)].shape[0],
+        # 'num_empty_cols': df.columns[df.isna().all(axis=0)].size,
+        'previous_page_url': 'edit_columns',
+        'next_page_url': 'download',
         'table': dataframe_to_html(df, classes='table table-striped'),
+        'original_file_name': os.path.basename(file_path)
     }
     
-    return render(request, '3_edit_data.html', context)
+    return render(request, '4_edit_data.html', context)
 
 
-def edit_columns(request):
-    context = {
-        'previous_page_url': 'edit_data',
-        'next_page_url': 'download'  
-    }
-    return render(request, '4_edit_columns.html', context)
+
 
 def download(request):
+    file_path = request.session.get('file_path', 'data')  # default to 'data'
     context = {
+        'original_file_name': os.path.basename(file_path),
         'previous_page_url': 'edit_columns',
         'next_page_url': None  # to disable pagination
     }
-
     file_format = request.GET.get('format')
     print(f"File format: {file_format}")
     
     if file_format:
-        file_path = request.session.get('file_path', 'data')  # default to 'data'
+        
         original_file_name = os.path.basename(file_path)
         original_file_dir = os.path.dirname(file_path)  # get the directory of the original file
         

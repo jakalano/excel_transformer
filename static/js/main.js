@@ -26,6 +26,8 @@ function handleSummaryPageActions() {
     }
 }
 
+
+
 // Call the function when the document is ready
 document.addEventListener('DOMContentLoaded', handleSummaryPageActions);
 

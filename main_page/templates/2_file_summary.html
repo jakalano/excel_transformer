@@ -4,7 +4,7 @@
 
 {% block content %}
 
-<h1>file name</h1>
+
 <div class="row">
   <div class="col-sm-6 mb-3 mb-sm-0">
       <div class="card">
@@ -31,10 +31,28 @@
               <p class="card-text">Number of Rows: {{ num_rows }}</p>
           </div>
       </div>
-  </div><br><br>
-<div>
+  </div>
+<div> <br><br>
+
+    <form id="deleteRowsForm" action="{% url 'summary' %}" method="post">
+        {% csrf_token %}
+        <label for="num_rows_to_delete_start">Delete first </label>
+        <input type="number" name="num_rows_to_delete_start" id="num_rows_to_delete_start" min="0">
+        <label for="num_rows_to_delete_start"> rows</label><br>
+        
+        <input type="checkbox" name="replace_header" id="replace_header">
+        <label for="replace_header">Delete header too</label><br>
+        
+        <label for="num_rows_to_delete_end">Delete last </label>
+        <input type="number" name="num_rows_to_delete_end" id="num_rows_to_delete_end" min="1">
+        <label for="num_rows_to_delete_end"> rows</label><br>
+        
+        <button type="submit">Delete Rows</button>
+    </form>
+<br> <br>    
 <form id="removeEmptyForm" action="{% url 'summary' %}" method="post">
   {% csrf_token %}
+  
   {% if num_empty_rows > 0 %}
   <label for="removeRowsCheckbox">There are {{ num_empty_rows }} empty rows. Delete them? </label>
       <input type="checkbox" name="remove_empty_rows" id="removeRowsCheckbox"> 
@@ -47,7 +65,7 @@
         <input type="checkbox" name="remove_empty_cols" value="{{ col }}"> {{ col }}<br>
     {% endfor %}
     
-{% endif %}
+    <br>{% endif %}
 {% if num_empty_cols > 0 or num_empty_rows > 0 %}
 <button type="submit">Submit</button>
 {% endif %}

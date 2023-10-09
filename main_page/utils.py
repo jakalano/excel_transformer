@@ -20,7 +20,7 @@ def load_dataframe_from_file(file_path):
         return pd.read_csv(file_path, delimiter=delimiter, encoding = 'utf8', dtype=str)
     
     elif file_extension in ['.xlsx', '.xls']:
-        return pd.read_excel(file_path, encoding = 'utf8')
+        return pd.read_excel(file_path)
     
     else:
         raise ValueError("Unsupported file type: {}".format(file_extension))
