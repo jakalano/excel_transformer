@@ -27,7 +27,7 @@ def main_page(request):
             
             # Determine the file type based on extension
             file_path = uploaded_file.file.path
-            df_orig = load_dataframe_from_file(file_path)
+            df_orig = load_dataframe_from_file(file_path, view_name='orig')
             html_table = dataframe_to_html(df_orig,classes='table table-striped')
             request.session['html_table'] = html_table
             request.session['file_path'] = file_path
@@ -45,7 +45,8 @@ def main_page(request):
 
 def summary(request):
     file_path = request.session.get('file_path')
-    df_v1 = load_dataframe_from_file(file_path)
+    df_v1 = load_dataframe_from_file(file_path, view_name='v1')
+    print(file_path)
     # Identify empty columns
     empty_cols = df_v1.columns[df_v1.isna().all()].tolist()
 
@@ -54,7 +55,7 @@ def summary(request):
             # print("Removing empty rows")
             df_v1 = remove_empty_rows(df_v1)
             # print(f"DataFrame shape after drop rows: {df_v1.shape}")
-            save_dataframe(df_v1, file_path)
+            # save_dataframe(df_v1, file_path)
         
         # Get selected columns to delete from POST data
         cols_to_delete = request.POST.getlist('remove_empty_cols')
@@ -83,7 +84,9 @@ def summary(request):
         if num_rows_to_delete_end > 0:
             df_v1 = df_v1.iloc[:-num_rows_to_delete_end]
         
-        save_dataframe(df_v1, file_path)
+        new_file_path = save_dataframe(df_v1, file_path, view_name='v1', overwrite=True)
+        # Update the session with the new file path
+        request.session['file_path'] = new_file_path
         # Redirect to avoid resubmit on refresh
         return redirect('summary')
 
@@ -104,11 +107,16 @@ def summary(request):
 
 def edit_columns(request):
     file_path = request.session.get('file_path')
-    df = load_dataframe_from_file(file_path)
+    df_v2 = load_dataframe_from_file(file_path, view_name='v2')
+
+
+    new_file_path = save_dataframe(df_v2, file_path, view_name='v2')
+        # Update the session with the new file path
+    request.session['file_path'] = new_file_path
     context = {
         'previous_page_url': 'summary',
         'next_page_url': 'edit_data',
-        'table': dataframe_to_html(df, classes='table table-striped'),
+        'table': dataframe_to_html(df_v2, classes='table table-striped'),
         'original_file_name': os.path.basename(file_path),
     }
     return render(request, '3_edit_columns.html', context)
