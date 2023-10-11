@@ -57,7 +57,9 @@
             <li class="nav-item">
               <a class="nav-link" href="{% url 'download' %}">Lejupielādēt</a>
             </li>
+            {% if user.is_authenticated %}
             <li class="nav-item dropdown">
+              
               <a
                 class="nav-link dropdown-toggle"
                 href="#"
@@ -70,9 +72,13 @@
               <ul class="dropdown-menu">
                 <li><a class="dropdown-item" href="#">Konts</a></li>
                 <li><a class="dropdown-item" href="#">Manas veidnes</a></li>
-                <li><a class="dropdown-item" href="#">Atteikties</a></li>
+                <li><a class="dropdown-item" href="{% url 'logout' %}">Atteikties</a></li>
               </ul>
+
             </li>
+              {% else %}
+  <a href="{% url 'login' %}">Login</a>
+{% endif %}            
           </ul>
         </div>
       </div>

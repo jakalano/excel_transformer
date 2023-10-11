@@ -7,7 +7,7 @@ from django.template import loader
 # from .models import UploadedFile
 from .utils import (
     load_dataframe_from_file, save_dataframe,
-    dataframe_to_html, remove_empty_rows
+    dataframe_to_html, remove_empty_rows,record_action
 )
 from .forms import UploadFileForm, ParagraphErrorList
 
@@ -62,6 +62,7 @@ def summary(request):
             # print("Removing empty rows")
             df_v1 = remove_empty_rows(df_v1)
             # print(f"DataFrame shape after drop rows: {df_v1.shape}")
+            record_action(request.user, 'remove_empty_rows', {})
             # save_dataframe(df_v1, temp_file_path)
         
         # Get selected columns to delete from POST data

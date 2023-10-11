@@ -3,6 +3,7 @@ import csv
 import re
 from datetime import datetime
 import pandas as pd
+from .models import Action, Template
 
 def detect_delimiter(file_path, num_lines=5):
     # detect the delimiter of a csv file
@@ -81,3 +82,21 @@ def dataframe_to_html(df, classes=None):
 def remove_empty_rows(df):
     """Remove all rows from a DataFrame that contain only NaN values."""
     return df.dropna(how='all')
+
+def record_action(user, action_type, parameters):
+    """
+    Record an action performed by a user.
+    """
+    return Action.objects.create(
+        user=user,
+        action_type=action_type,
+        parameters=parameters,
+    )
+
+def save_as_template(user, actions, template_name):
+    """
+    Save actions as a template.
+    """
+    template = Template.objects.create(name=template_name, user=user)
+    template.actions.add(*actions)
+    return template

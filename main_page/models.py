@@ -1,7 +1,9 @@
 import os
+import json
 from datetime import datetime
 from django.db import models
 from django.core.exceptions import ValidationError
+from django.contrib.auth.models import User
 
 def validate_file_extension(value):
     valid_content_type = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv', 'application/vnd.ms-excel']
@@ -22,3 +24,17 @@ class UploadedFile(models.Model):
     def __str__(self):
         return self.file.name
 
+class Action(models.Model):
+    ACTION_CHOICES = [
+        ('delete_row', 'Delete Row'),
+        # Add other actions as needed
+    ]
+    action_type = models.CharField(choices=ACTION_CHOICES, max_length=50)
+    parameters = models.JSONField()  # Store parameters as JSON
+    timestamp = models.DateTimeField(auto_now_add=True)  # Automatically set when record is created
+    user = models.ForeignKey(User, null=True, on_delete=models.SET_NULL)  # Link action to user
+    
+class Template(models.Model):
+    actions = models.ManyToManyField(Action)
+    name = models.CharField(max_length=100)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)  # Link template to user

@@ -130,6 +130,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')
 
+LOGIN_REDIRECT_URL = '/'  # Redirect to home after login
+
 # Additional settings for static files in development (not for production use)
 if DEBUG:
     STATICFILES_DIRS = [
@@ -137,3 +139,4 @@ if DEBUG:
     ]
     import mimetypes
     mimetypes.add_type("application/javascript", ".js", True)
+

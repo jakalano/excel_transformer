@@ -1,5 +1,5 @@
 from django import forms
-from .models import UploadedFile
+from .models import UploadedFile, Action, Template
 from django.forms.utils import ErrorList
 
 class UploadFileForm(forms.ModelForm):
@@ -18,3 +18,13 @@ class ParagraphErrorList(ErrorList):
         if not self:
             return ''
         return '<p class="alert alert-danger">%s</p>' % '</p><p class="alert alert-danger">'.join([str(e) for e in self])
+    
+class ActionForm(forms.ModelForm):
+    class Meta:
+        model = Action
+        fields = ['action_type', 'parameters']
+
+class TemplateForm(forms.ModelForm):
+    class Meta:
+        model = Template
+        fields = ['name', 'actions']
