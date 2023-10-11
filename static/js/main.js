@@ -26,6 +26,68 @@ function handleSummaryPageActions() {
     }
 }
 
+// document.addEventListener('DOMContentLoaded', function() {
+//     let undoButton = document.getElementById('undo-button');
+//     if (undoButton) {
+//         undoButton.addEventListener('click', function() {
+//             console.log("Undo button clicked!");
+//     // Send AJAX request to undo view
+//     fetch('/undo/', {
+//         method: 'POST',
+//         headers: {
+//             'Content-Type': 'application/json',
+//             'X-CSRFToken': csrfToken,  // Pass CSRF token
+//         },
+//         body: JSON.stringify({
+//             'session_key': sessionKey,
+//         })
+//     })
+//     .then(response => response.json())
+//     .then(data => {
+//         // Update UI accordingly
+//     })
+// });
+// } else {
+//     console.error('Undo button not found!');
+// }
+// });
+
+document.addEventListener('DOMContentLoaded', function() {
+    let undoButton = document.getElementById('undo-button');
+    if (undoButton) {
+        undoButton.addEventListener('click', async function(event) {
+            // Prevent form submission
+            event.preventDefault();
+            console.log("Undo button clicked!");
+
+            try {
+                let response = await fetch('/undo/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken,
+                    },
+                    body: JSON.stringify({
+                        'session_key': sessionKey,
+                    })
+                });
+
+                // Check if response is ok (status 200-299)
+                if(!response.ok) {
+                    throw new Error('Network response was not ok' + response.statusText);
+                }
+
+                let data = await response.json();
+                // handle your data...
+            } catch(error) {
+                console.error('There was a problem with the fetch operation:', error);
+            }
+        });
+    } else {
+        console.error('Undo button not found!');
+    }
+});
+
 
 
 // Call the function when the document is ready

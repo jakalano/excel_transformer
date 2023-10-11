@@ -19,7 +19,8 @@ pip freeze > requirements.txt
 - fix excel ingestion encoding issue
 - figure out how files should be stored for fastest processing
 - add back xml format?
-- add odt, tsv formats?
+- add odt, tsv formats for both read and save?
+- append column headers with text
 
 
 # error log fixed

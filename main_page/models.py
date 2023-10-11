@@ -33,6 +33,7 @@ class Action(models.Model):
     parameters = models.JSONField()  # Store parameters as JSON
     timestamp = models.DateTimeField(auto_now_add=True)  # Automatically set when record is created
     user = models.ForeignKey(User, null=True, on_delete=models.SET_NULL)  # Link action to user
+    session_id = models.CharField(max_length=256, null=True)  # Store session ID
     
 class Template(models.Model):
     actions = models.ManyToManyField(Action)

@@ -83,7 +83,7 @@ def remove_empty_rows(df):
     """Remove all rows from a DataFrame that contain only NaN values."""
     return df.dropna(how='all')
 
-def record_action(user, action_type, parameters):
+def record_action(action_type, parameters, user, session_id):
     """
     Record an action performed by a user.
     """
@@ -91,6 +91,7 @@ def record_action(user, action_type, parameters):
         user=user,
         action_type=action_type,
         parameters=parameters,
+        session_id=session_id,
     )
 
 def save_as_template(user, actions, template_name):

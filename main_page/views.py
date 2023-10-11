@@ -1,15 +1,17 @@
 import os
 import pandas as pd
 from datetime import datetime
+from urllib.parse import urlparse
 from django.shortcuts import render, redirect
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
+from django.urls import resolve
 from django.template import loader
-# from .models import UploadedFile
 from .utils import (
     load_dataframe_from_file, save_dataframe,
     dataframe_to_html, remove_empty_rows,record_action
 )
 from .forms import UploadFileForm, ParagraphErrorList
+from .models import Action
 
 
 
@@ -49,6 +51,87 @@ def main_page(request):
     
     return render(request, '1_index.html', context)
 
+def undo_last_action(request):
+    print("Undo view accessed")
+    print(f"Session Original File Path: {request.session.get('file_path')}")
+
+    # Load the original file
+    original_file_path = request.session.get('file_path')
+    if original_file_path is None:
+        # Handle the error: log it, inform the user, etc.
+        print("Original file path is None!")
+        return JsonResponse({'status': 'error', 'error': 'Original file path not found'}, status=500)
+
+    df = load_dataframe_from_file(original_file_path)
+
+    # Get all actions for this session, excluding the last one
+    actions_count = Action.objects.filter(session_id=request.session.session_key).count()
+    if actions_count > 1:
+        actions = Action.objects.filter(session_id=request.session.session_key).order_by('-timestamp')[:actions_count-1]
+    else:
+        actions = Action.objects.none()
+
+
+
+    # Apply all actions to the dataframe
+    for action in actions:
+        df = apply_action(df, action.action_type, action.parameters)
+        
+
+    # Save the modified dataframe back to the temporary file path
+    temp_file_path = request.session.get('temp_file_path')
+    save_dataframe(df, temp_file_path)
+
+    # Get the referring view name and redirect back to it
+    referer_url = request.META.get('HTTP_REFERER')
+    if referer_url:
+        view_name = resolve(urlparse(referer_url).path).url_name
+        return redirect(view_name)
+    
+    # Fallback redirect if referer is not available
+    return redirect('summary')
+
+# def undo_last_action(request):
+#     try:
+#         # your undo logic here...
+#         return JsonResponse({'status': 'ok'})
+#     except Exception as e:
+#         return JsonResponse({'status': 'error', 'error': str(e)}, status=500)
+
+
+def apply_action(df, action_type, parameters):
+    try:
+        print(f"Applying {action_type} with {parameters}")
+
+        if action_type == 'remove_empty_rows':
+            return remove_empty_rows(df)
+        
+        elif action_type == 'remove_empty_cols':
+            cols_to_delete = parameters.get('cols_to_delete')
+            return df.drop(cols_to_delete, axis=1)
+        
+        elif action_type == 'delete_first_X_rows':
+            num_rows_to_delete_start = int(parameters.get('num_rows_to_delete_start', 0))
+            return df.iloc[num_rows_to_delete_start:]
+        
+        elif action_type == 'replace_header':
+            df.columns = df.iloc[0]
+            return df.iloc[1:]
+        
+        elif action_type == 'delete_last_X_rows':
+            num_rows_to_delete_end = int(parameters.get('num_rows_to_delete_end', 0))
+            return df.iloc[:-num_rows_to_delete_end] if num_rows_to_delete_end else df
+        
+        else:
+            print(f"Unknown action type: {action_type}")
+            return df
+    
+    except Exception as e:
+        print(f"Error applying action {action_type} with parameters {parameters}: {str(e)}")
+        return df
+
+    
+
 def summary(request):
     temp_file_path = request.session.get('temp_file_path')
     file_path = request.session.get('file_path')
@@ -58,17 +141,27 @@ def summary(request):
     empty_cols = df_v1.columns[df_v1.isna().all()].tolist()
 
     if request.method == 'POST':
+        # delete all empty rows
         if 'remove_empty_rows' in request.POST:
-            # print("Removing empty rows")
             df_v1 = remove_empty_rows(df_v1)
-            # print(f"DataFrame shape after drop rows: {df_v1.shape}")
-            record_action(request.user, 'remove_empty_rows', {})
-            # save_dataframe(df_v1, temp_file_path)
-        
-        # Get selected columns to delete from POST data
-        cols_to_delete = request.POST.getlist('remove_empty_cols')
-        # Delete selected columns
-        df_v1 = df_v1.drop(columns=cols_to_delete)
+
+            record_action(        
+                action_type='remove_empty_rows',
+                parameters={},
+                user=request.user,
+                session_id=request.session.session_key,
+                )
+           
+        # delete selected columns
+        if 'remove_empty_cols' in request.POST:
+            cols_to_delete = request.POST.getlist('remove_empty_cols')
+            df_v1 = df_v1.drop(columns=cols_to_delete)
+            record_action(        
+                    action_type='remove_empty_cols',
+                    parameters={'cols_to_delete': cols_to_delete},
+                    user=request.user,
+                    session_id=request.session.session_key,
+                    )
 
         num_rows_to_delete_start = request.POST.get('num_rows_to_delete_start')
         replace_header = 'replace_header' in request.POST
@@ -76,14 +169,28 @@ def summary(request):
 
         # Check if num_rows_to_delete_start is not None and convert to int, else default to 0
         num_rows_to_delete_start = int(num_rows_to_delete_start) if num_rows_to_delete_start else 0
+        
 
-        # Logic to delete the first X rows and possibly replace the header
-        df_v1 = df_v1.iloc[num_rows_to_delete_start:]
+        # Logic to delete the first X rows
+        if num_rows_to_delete_start > 0:
+            df_v1 = df_v1.iloc[num_rows_to_delete_start:]
+            record_action(        
+                    action_type='delete_first_X_rows',
+                    parameters={'num_rows_to_delete_start': num_rows_to_delete_start},
+                    user=request.user,
+                    session_id=request.session.session_key,
+                    )
         
         # If replace_header is True, set the dataframe columns to the first row's values
         if replace_header:
             df_v1.columns = df_v1.iloc[0]
             df_v1 = df_v1.iloc[1:]
+            record_action(        
+                    action_type='replace_header',
+                    parameters={},
+                    user=request.user,
+                    session_id=request.session.session_key,
+                    )
 
         # Check if num_rows_to_delete_end is not None and convert to int, else default to 0
         num_rows_to_delete_end = int(num_rows_to_delete_end) if num_rows_to_delete_end else 0
@@ -91,6 +198,12 @@ def summary(request):
         # Logic to delete the last X rows
         if num_rows_to_delete_end > 0:
             df_v1 = df_v1.iloc[:-num_rows_to_delete_end]
+            record_action(        
+                    action_type='delete_last_X_rows',
+                    parameters={'num_rows_to_delete_end': num_rows_to_delete_end},
+                    user=request.user,
+                    session_id=request.session.session_key,
+                    )
         
         temp_file_path = save_dataframe(df_v1, temp_file_path)
         # Update the session with the new file path
@@ -156,6 +269,10 @@ def download(request):
     }
     file_format = request.GET.get('format')
     print(f"File format: {file_format}")
+
+    ############# for filtering from db session activities for template creation
+    ############# actions_for_session = Action.objects.filter(session_id=some_session_key)
+
     
     if file_format:
         
