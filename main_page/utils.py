@@ -74,7 +74,7 @@ def save_dataframe(df, save_path, file_format=None):
 
 def dataframe_to_html(df, classes=None):
     """Convert a DataFrame to an HTML table."""
-    df.columns = [f"{col}<br>({str(dtype)})" for col, dtype in zip(df.columns, df.dtypes)]
+    df.columns = [col for col, dtype in zip(df.columns, df.dtypes)]
     
     # Convert NaN values to an empty string and convert DataFrame to HTML
     return df.fillna('').to_html(classes=classes, escape=False)

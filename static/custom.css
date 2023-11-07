@@ -22,3 +22,20 @@
   max-height: 400px; 
 
 }
+
+/* This targets .nav-link elements with .active class inside .navbar-nav */
+.navbar-nav .nav-link.active {
+  background-color: #065520; 
+  color: white;
+  border-radius: .25rem; /* Optional: for rounded corners */
+}
+
+.navbar-nav .nav-link.active:hover {
+  background-color: #168039;
+  color: white;
+}
+
+.navbar-nav .nav-link:hover {
+  background-color: #c6c9c9;
+  color: rgb(0, 0, 0);
+}

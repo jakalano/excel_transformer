@@ -29,6 +29,7 @@ class Action(models.Model):
         ('delete_row', 'Delete Row'),
         # Add other actions as needed
     ]
+    #uploaded_file = models.ForeignKey(UploadedFile, on_delete=models.CASCADE)
     action_type = models.CharField(choices=ACTION_CHOICES, max_length=50)
     parameters = models.JSONField()  # Store parameters as JSON
     timestamp = models.DateTimeField(auto_now_add=True)  # Automatically set when record is created

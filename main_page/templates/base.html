@@ -40,22 +40,22 @@
         <div class="collapse navbar-collapse" id="navbarNavDropdown">
           <ul class="navbar-nav me-auto mb-2 mb-lg-0">
             <li class="nav-item">
-              <a class="nav-link active" aria-current="page" href="/"
+              <a class="nav-link {% if active_page == 'home' %}active{% endif %}" aria-current="page" href="/"
                 >Galvenā lapa</a
               >
             </li>
             <li class="nav-item">
-              <a class="nav-link" href="{% url 'summary' %}">Informācija par failu</a>
+              <a class="nav-link {% if active_page == 'summary' %}active{% endif %}" href="{% url 'summary' %}">Informācija par failu</a>
             </li>
             <li class="nav-item">
-              <a class="nav-link" href="{% url 'edit_columns' %}">Labot kolonnas</a>
+              <a class="nav-link {% if active_page == 'edit_columns' %}active{% endif %}" href="{% url 'edit_columns' %}">Labot kolonnas</a>
             </li>
             <li class="nav-item">
-              <a class="nav-link" href="{% url 'edit_data' %}">Labot datus</a>
+              <a class="nav-link {% if active_page == 'edit_data' %}active{% endif %}" href="{% url 'edit_data' %}">Labot datus</a>
             </li>
             
             <li class="nav-item">
-              <a class="nav-link" href="{% url 'download' %}">Lejupielādēt</a>
+              <a class="nav-link {% if active_page == 'download' %}active{% endif %}" href="{% url 'download' %}">Lejupielādēt</a>
             </li></ul>
             <span class="nav-item  me-4">
             {% if user.is_authenticated %}

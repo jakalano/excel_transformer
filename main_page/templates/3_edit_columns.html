@@ -1,4 +1,57 @@
 {% extends "base.html" %} {% block content %}
+
+<form method="post" action="{% url 'edit_columns' %}">
+  {% csrf_token %}
+  <input type="text" name="new_column_name" placeholder="Enter new column header">
+  <button type="submit" name="action" value="add_column">Add Column</button>
+<br><br>
+
+  <select name="columns_to_delete" multiple>
+    {% for column in df_v2.columns %}
+      <option value="{{ column }}">{{ column }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" name="action" value="delete_columns">Delete Selected Columns</button>
+<br><br>  
+
+  <select name="column_to_fill">
+    {% for column in df_v2.columns %}
+      <option value="{{ column }}">{{ column }}</option>
+    {% endfor %}
+  </select>
+  <input type="text" name="fill_value" placeholder="Enter value to fill">
+  <select name="fill_option">
+    <option value="all">Fill All</option>
+    <option value="empty">Fill Empty</option>
+  </select>
+  <button type="submit" name="action" value="fill_column">Fill Column</button>
+<br><br>  
+
+<select name="column_to_split">
+  {% for column in df_v2.columns %}
+    <option value="{{ column }}">{{ column }}</option>
+  {% endfor %}
+</select>
+<input type="text" name="split_value" placeholder="Enter character(s) to split on">
+<input type="checkbox" name="delete_original" id="delete_original">
+<label for="delete_original">Delete original column after split</label>
+<button type="submit" name="action" value="split_column">Split Column</button>
+<br><br> 
+
+<label>Select columns to merge (in order):</label>
+<select name="columns_to_merge" multiple>
+  {% for column in df_v2.columns %}
+    <option value="{{ column }}">{{ column }}</option>
+  {% endfor %}
+</select>
+<input type="text" name="merge_separator" placeholder="Enter separator">
+<input type="text" name="new_column_name" placeholder="Enter new column name">
+<button type="submit" name="action" value="merge_columns">Merge Columns</button>
+
+
+</form>
+
+<br><br>
 <div class="container">
   <div class="scrollable-table">
       {{ table|safe }}

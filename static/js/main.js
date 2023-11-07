@@ -60,6 +60,9 @@ document.addEventListener('DOMContentLoaded', function() {
             event.preventDefault();
             console.log("Undo button clicked!");
 
+            // Initialize responseClone outside of the try block
+            let responseClone;
+
             try {
                 let response = await fetch('/undo/', {
                     method: 'POST',
@@ -72,21 +75,32 @@ document.addEventListener('DOMContentLoaded', function() {
                     })
                 });
 
-                // Check if response is ok (status 200-299)
+                // Clone the response right after fetching
+                responseClone = response.clone();
+
                 if(!response.ok) {
-                    throw new Error('Network response was not ok' + response.statusText);
+                    throw new Error('Network response was not ok: ' + response.statusText);
                 }
 
                 let data = await response.json();
-                // handle your data...
+                // Handle your data...
             } catch(error) {
-                console.error('There was a problem with the fetch operation:', error);
+                console.error('There was a problem with the fetch operation:', error.message);
+                // Use the cloned response to read the text without consuming the original response
+                if(responseClone) {
+                    responseClone.text().then(text => console.error('Response text:', text));
+                } else {
+                    console.error('Response clone is not available.');
+                }
             }
         });
     } else {
         console.error('Undo button not found!');
     }
 });
+
+
+
 
 
 

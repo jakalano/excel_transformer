@@ -19,7 +19,8 @@ from .models import Action
 def main_page(request):
     context = {
         'previous_page_url': None,
-        'next_page_url': 'summary'
+        'next_page_url': 'summary',
+        'active_page': 'home'
     }
     if request.method == 'POST':
         form = UploadFileForm(request.POST, request.FILES, error_class=ParagraphErrorList)
@@ -51,6 +52,8 @@ def main_page(request):
     
     return render(request, '1_index.html', context)
 
+from django.http import JsonResponse
+
 def undo_last_action(request):
     print("Undo view accessed")
     print(f"Session Original File Path: {request.session.get('file_path')}")
@@ -67,29 +70,25 @@ def undo_last_action(request):
     # Get all actions for this session, excluding the last one
     actions_count = Action.objects.filter(session_id=request.session.session_key).count()
     if actions_count > 1:
-        actions = Action.objects.filter(session_id=request.session.session_key).order_by('-timestamp')[:actions_count-1]
+        last_action = Action.objects.filter(session_id=request.session.session_key).latest('timestamp')
+        actions = Action.objects.filter(session_id=request.session.session_key).exclude(id=last_action.id)
+
     else:
         actions = Action.objects.none()
-
-
 
     # Apply all actions to the dataframe
     for action in actions:
         df = apply_action(df, action.action_type, action.parameters)
-        
 
     # Save the modified dataframe back to the temporary file path
     temp_file_path = request.session.get('temp_file_path')
     save_dataframe(df, temp_file_path)
 
-    # Get the referring view name and redirect back to it
-    referer_url = request.META.get('HTTP_REFERER')
-    if referer_url:
-        view_name = resolve(urlparse(referer_url).path).url_name
-        return redirect(view_name)
-    
-    # Fallback redirect if referer is not available
-    return redirect('summary')
+    # Instead of redirecting, return a JsonResponse with the necessary data
+    # For example, return the updated HTML table or any other data that the client-side needs to update the UI
+    updated_table_html = dataframe_to_html(df)
+    return JsonResponse({'status': 'success', 'updated_table': updated_table_html})
+
 
 # def undo_last_action(request):
 #     try:
@@ -221,6 +220,7 @@ def summary(request):
         'table': dataframe_to_html(df_v1, classes='table table-striped'),
         'original_file_name': os.path.basename(file_path),
         'previous_page_url': 'main_page',
+        'active_page': 'summary',
         'next_page_url': 'edit_columns',
     }
     
@@ -230,15 +230,74 @@ def edit_columns(request):
     temp_file_path = request.session.get('temp_file_path')
     file_path = request.session.get('file_path')
     df_v2 = load_dataframe_from_file(temp_file_path)
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'add_column':
+            # Handle adding a new column
+            new_column_name = request.POST.get('new_column_name')
+            if new_column_name:
+                df_v2[new_column_name] = None
 
+
+            # Handle deleting selected columns
+        if action == 'delete_columns':
+            columns_to_delete = request.POST.getlist('columns_to_delete')
+            df_v2.drop(columns=columns_to_delete, inplace=True)
+
+
+        if action == 'fill_column':
+            column_to_fill = request.POST.get('column_to_fill')
+            fill_value = request.POST.get('fill_value')
+            fill_option = request.POST.get('fill_option')
+
+            if column_to_fill and fill_value is not None:
+                if fill_option == 'all':
+                    df_v2[column_to_fill] = fill_value
+                elif fill_option == 'empty':
+                    df_v2[column_to_fill].fillna(fill_value, inplace=True)
+
+        if action == 'split_column':
+            column_to_split = request.POST.get('column_to_split')
+            split_value = request.POST.get('split_value')
+            delete_original = 'delete_original' in request.POST
+
+            if column_to_split in df_v2.columns and split_value:
+                # Perform the split operation
+                split_data = df_v2[column_to_split].str.split(split_value, expand=True)
+                for i, new_column in enumerate(split_data.columns):
+                    new_column_name = f"{column_to_split}_split_{i+1}"
+                    df_v2[new_column_name] = split_data[new_column]
+
+                # If user opted to delete the original column, drop it
+                if delete_original:
+                    df_v2.drop(columns=[column_to_split], inplace=True)
+
+        if action == 'merge_columns':
+            columns_to_merge = request.POST.getlist('columns_to_merge')
+            merge_separator = request.POST.get('merge_separator', '')
+            new_column_name = request.POST.get('new_column_name')
+
+            if not new_column_name:
+                new_column_name = 'merged_column'
+
+            if columns_to_merge:
+                # Perform the merge operation
+                df_v2[new_column_name] = df_v2[columns_to_merge].astype(str).apply(merge_separator.join, axis=1)
+
+            
+        save_dataframe(df_v2, temp_file_path)
+        return redirect('edit_columns')
 
     context = {
         'previous_page_url': 'summary',
+        'active_page': 'edit_columns',
         'next_page_url': 'edit_data',
         'table': dataframe_to_html(df_v2, classes='table table-striped'),
         'original_file_name': os.path.basename(file_path),
+        'df_v2': df_v2,  # Pass the DataFrame to the template context
     }
     return render(request, '3_edit_columns.html', context)
+
 
 def edit_data(request):
     temp_file_path = request.session.get('temp_file_path')
@@ -249,6 +308,7 @@ def edit_data(request):
         # 'num_empty_rows': df[df.isna().all(axis=1)].shape[0],
         # 'num_empty_cols': df.columns[df.isna().all(axis=0)].size,
         'previous_page_url': 'edit_columns',
+        'active_page': 'edit_data',
         'next_page_url': 'download',
         'table': dataframe_to_html(df, classes='table table-striped'),
         'original_file_name': os.path.basename(file_path)
@@ -265,6 +325,7 @@ def download(request):
     context = {
         'original_file_name': os.path.basename(file_path),
         'previous_page_url': 'edit_columns',
+        'active_page': 'download',
         'next_page_url': None  # to disable pagination
     }
     file_format = request.GET.get('format')

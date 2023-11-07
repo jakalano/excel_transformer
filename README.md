@@ -1,9 +1,9 @@
 # excel-failu-parveidotajs
 ```
-create venv
+create venv in project root folder
 pip install -r requirements.txt
 
-excel\Scripts\Activate.ps1
+excel\Scripts\Activate
 
 py manage.py runserver
 
@@ -21,6 +21,11 @@ pip freeze > requirements.txt
 - add back xml format?
 - add odt, tsv formats for both read and save?
 - append column headers with text
+- rework undo for the system to take snapshots every five actions that the redo -1 will be applied to? would increase performance for large files or long lists of actions. or create snapshots for every view?
+- fix undo
+- add action recording for every action
+- wrap each action in a collapsible wrapper to declutter the views?
+- implement better data manipulation for column merge in cases of all values NaN or some values NaN
 
 
 # error log fixed
