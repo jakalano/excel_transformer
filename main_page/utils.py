@@ -87,12 +87,19 @@ def record_action(action_type, parameters, user, session_id):
     """
     Record an action performed by a user.
     """
+    # Check if the user is authenticated
+    if user.is_authenticated:
+        user_instance = user
+    else:
+        user_instance = None  # or a default user if you have one
+
     return Action.objects.create(
-        user=user,
+        user=user_instance,
         action_type=action_type,
         parameters=parameters,
         session_id=session_id,
     )
+
 
 def save_as_template(user, actions, template_name):
     """
