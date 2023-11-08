@@ -12,7 +12,7 @@ from .utils import (
 )
 from .forms import UploadFileForm, ParagraphErrorList
 from .models import Action
-
+from django.contrib import messages
 
 
 
@@ -52,8 +52,6 @@ def main_page(request):
     
     return render(request, '1_index.html', context)
 
-from django.http import JsonResponse
-
 def undo_last_action(request):
     print("Undo view accessed")
     print(f"Session Original File Path: {request.session.get('file_path')}")
@@ -89,14 +87,12 @@ def undo_last_action(request):
     updated_table_html = dataframe_to_html(df)
     return JsonResponse({'status': 'success', 'updated_table': updated_table_html})
 
-
 # def undo_last_action(request):
 #     try:
 #         # your undo logic here...
 #         return JsonResponse({'status': 'ok'})
 #     except Exception as e:
 #         return JsonResponse({'status': 'error', 'error': str(e)}, status=500)
-
 
 def apply_action(df, action_type, parameters):
     try:
@@ -128,8 +124,6 @@ def apply_action(df, action_type, parameters):
     except Exception as e:
         print(f"Error applying action {action_type} with parameters {parameters}: {str(e)}")
         return df
-
-    
 
 def summary(request):
     temp_file_path = request.session.get('temp_file_path')
@@ -284,6 +278,13 @@ def edit_columns(request):
                 # Perform the merge operation
                 df_v2[new_column_name] = df_v2[columns_to_merge].astype(str).apply(merge_separator.join, axis=1)
 
+        if action == 'rename_column':
+            column_to_rename = request.POST.get('column_to_rename')
+            new_column_name = request.POST.get('new_column_name')
+
+            if column_to_rename in df_v2.columns and new_column_name:
+                df_v2.rename(columns={column_to_rename: new_column_name}, inplace=True)
+                save_dataframe(df_v2, temp_file_path)
             
         save_dataframe(df_v2, temp_file_path)
         return redirect('edit_columns')
@@ -294,15 +295,83 @@ def edit_columns(request):
         'next_page_url': 'edit_data',
         'table': dataframe_to_html(df_v2, classes='table table-striped'),
         'original_file_name': os.path.basename(file_path),
-        'df_v2': df_v2,  # Pass the DataFrame to the template context
+        'df_v2': df_v2,  # Pass the DataFrame to the template context'
     }
     return render(request, '3_edit_columns.html', context)
 
-
 def edit_data(request):
+
     temp_file_path = request.session.get('temp_file_path')
     file_path = request.session.get('file_path')
-    df = load_dataframe_from_file(temp_file_path)
+    df_v3 = load_dataframe_from_file(temp_file_path)
+    if request.method == 'POST':
+        print("POST request received")  # This should always print when a form is submitted
+        action = request.POST.get('action')
+        print(f"Action received: {action}")  # This should print the action value
+
+
+        if action == 'delete_data':
+            columns_to_modify = request.POST.getlist('columns_to_modify')
+            delimiter = request.POST.get('delimiter')
+            delete_option = request.POST.get('delete_option')
+            include_delimiter = 'include_delimiter' in request.POST
+            apply_to_all = '__all__' in columns_to_modify
+
+            if apply_to_all:
+                columns_to_modify = df_v3.columns.tolist()  # List all columns if '--ALL COLUMNS--' is selected
+
+            for column in columns_to_modify:
+                if column in df_v3.columns:
+                    # Convert entire column to strings, replacing NaN with empty strings
+                    column_series = df_v3[column].fillna('').astype(str)
+                    try:
+                        # print(f"Before operation: {column_series.head()}")
+                        if include_delimiter:
+                            # If the user wants to delete the delimiter along with the data
+                            if delete_option == 'before':
+                                df_v3[column] = column_series.apply(lambda x: x.split(delimiter)[-1] if delimiter in x else x)
+                            elif delete_option == 'after':
+                                df_v3[column] = column_series.apply(lambda x: x.split(delimiter)[0] if delimiter in x else x)
+                        else:
+                            # If the user wants to keep the delimiter
+                            if delete_option == 'before':
+                                df_v3[column] = column_series.apply(lambda x: x.split(delimiter, 1)[-1] if delimiter in x else x)
+                            elif delete_option == 'after':
+                                # Append the delimiter after the operation if it's not to be deleted
+                                df_v3[column] = column_series.apply(lambda x: delimiter + x.split(delimiter, 1)[-1] if delimiter in x else x)
+                                # print(f"After operation: {df_v3[column].head()}")
+                    except Exception as e:
+                        print(f"Error processing column {column}: {e}")
+
+
+        if action == 'replace_symbol':
+            columns_to_replace = request.POST.getlist('columns_to_replace')
+            old_symbol = request.POST.get('old_symbol')
+            new_symbol = request.POST.get('new_symbol')
+            # Default to False if the checkbox is not checked
+            case_sensitive = 'case_sensitive' in request.POST
+            apply_to_all = '__all__' in columns_to_replace
+
+            if apply_to_all:
+                columns_to_replace = df_v3.columns.tolist()  # List all columns if '--ALL COLUMNS--' is selected
+
+
+            for column in columns_to_replace:
+                if column in df_v3.columns:
+                    try:
+                        #print(f"Before operation: {df_v3[column].head()}")
+                        if case_sensitive:
+                            # Case sensitive replacement
+                            df_v3[column] = df_v3[column].str.replace(old_symbol, new_symbol, regex=True)
+                        else:
+                            # Case insensitive replacement
+                            df_v3[column] = df_v3[column].str.replace(old_symbol, new_symbol, case=False, regex=True)
+                        #print(f"After operation: {df_v3[column].head()}")
+                    except Exception as e:
+                        print(f"Error processing column {column}: {e}")
+            
+        save_dataframe(df_v3, temp_file_path)
+        return redirect('edit_data')
     
     context = {
         # 'num_empty_rows': df[df.isna().all(axis=1)].shape[0],
@@ -310,8 +379,9 @@ def edit_data(request):
         'previous_page_url': 'edit_columns',
         'active_page': 'edit_data',
         'next_page_url': 'download',
-        'table': dataframe_to_html(df, classes='table table-striped'),
-        'original_file_name': os.path.basename(file_path)
+        'table': dataframe_to_html(df_v3, classes='table table-striped'),
+        'original_file_name': os.path.basename(file_path),
+        'df_v3': df_v3,  # Pass the DataFrame to the template context
     }
     
     return render(request, '4_edit_data.html', context)

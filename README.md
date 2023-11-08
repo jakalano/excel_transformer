@@ -26,6 +26,7 @@ pip freeze > requirements.txt
 - add action recording for every action
 - wrap each action in a collapsible wrapper to declutter the views?
 - implement better data manipulation for column merge in cases of all values NaN or some values NaN
+- disappearing pop-up after each action about how many values were changed
 
 
 # error log fixed

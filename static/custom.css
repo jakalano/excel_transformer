@@ -38,4 +38,5 @@
 .navbar-nav .nav-link:hover {
   background-color: #c6c9c9;
   color: rgb(0, 0, 0);
+  border-radius: .25rem;
 }

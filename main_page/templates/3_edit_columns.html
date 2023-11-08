@@ -47,6 +47,15 @@
 <input type="text" name="merge_separator" placeholder="Enter separator">
 <input type="text" name="new_column_name" placeholder="Enter new column name">
 <button type="submit" name="action" value="merge_columns">Merge Columns</button>
+<br><br> 
+
+<select name="column_to_rename">
+  {% for column in df_v2.columns %}
+    <option value="{{ column }}">{{ column }}</option>
+  {% endfor %}
+</select>
+<input type="text" name="new_column_name" placeholder="Enter new column name">
+<button type="submit" name="action" value="rename_column">Rename Column</button>
 
 
 </form>

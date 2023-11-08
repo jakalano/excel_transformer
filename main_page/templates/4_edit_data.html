@@ -1,6 +1,48 @@
 {% extends "base.html" %} 
 {% block content %}
 <div class="container">
+    <form method="post" action="{% url 'edit_data' %}">
+      {% csrf_token %}
+      <!-- Form for deleting data based on a delimiter -->
+      <select name="columns_to_modify" multiple>
+        <option value="__all__">--ALL COLUMNS--</option> <!-- Special value to indicate all columns -->
+        {% for column in df_v3.columns %}
+          <option value="{{ column }}">{{ column }}</option>
+        {% endfor %}
+      </select>
+      <input type="text" name="delimiter" placeholder="Enter delimiter">
+      <select name="delete_option">
+        <option value="before">Delete Before</option>
+        <option value="after">Delete After</option>
+      </select>
+      <input type="checkbox" name="include_delimiter" id="include_delimiter" checked>
+    <label for="include_delimiter">Include Delimiter in Deletion</label>
+      <!-- <input type="hidden" name="action" value="delete_data"> Hidden input for the action -->
+      <button type="submit" name="action" value="delete_data">Delete Data</button>
+      <br><br>
+    
+    <!-- New form for replacing symbols in a column -->
+    
+        <select name="columns_to_replace" multiple>
+            <option value="__all__">--ALL COLUMNS--</option> <!-- Special value to indicate all columns -->
+          {% for column in df_v3.columns %}
+            <option value="{{ column }}">{{ column }}</option>
+          {% endfor %}
+        </select>
+        <input type="text" name="old_symbol" placeholder="Enter symbol to replace">
+        <input type="text" name="new_symbol" placeholder="Enter new symbol">
+
+        <input type="checkbox" name="case_sensitive" id="case_sensitive">
+        <label for="case_sensitive">Case Sensitive</label>
+        <button type="submit" name="action" value="replace_symbol">Replace Symbol</button>
+    <br><br>
+
+
+
+      </form>
+      <br><br>
+
+
     <div class="scrollable-table">
         {{ table|safe }}
     </div>
