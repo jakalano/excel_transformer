@@ -6,6 +6,7 @@
   <button type="submit" name="action" value="add_column">Add Column</button>
 <br><br>
 
+<h2>Delete Selected Columns</h2>
   <select name="columns_to_delete" multiple>
     {% for column in df_v2.columns %}
       <option value="{{ column }}">{{ column }}</option>
@@ -14,6 +15,7 @@
   <button type="submit" name="action" value="delete_columns">Delete Selected Columns</button>
 <br><br>  
 
+<h2>Autofill Selected Columns</h2>
   <select name="column_to_fill">
     {% for column in df_v2.columns %}
       <option value="{{ column }}">{{ column }}</option>
@@ -27,6 +29,7 @@
   <button type="submit" name="action" value="fill_column">Fill Column</button>
 <br><br>  
 
+<h2>Split Selected Columns</h2>
 <select name="column_to_split">
   {% for column in df_v2.columns %}
     <option value="{{ column }}">{{ column }}</option>
@@ -38,6 +41,7 @@
 <button type="submit" name="action" value="split_column">Split Column</button>
 <br><br> 
 
+<h2>Merge Selected Columns</h2>
 <label>Select columns to merge (in order):</label>
 <select name="columns_to_merge" multiple>
   {% for column in df_v2.columns %}
@@ -49,6 +53,7 @@
 <button type="submit" name="action" value="merge_columns">Merge Columns</button>
 <br><br> 
 
+<h2>Rename Selected Columns</h2>
 <select name="column_to_rename">
   {% for column in df_v2.columns %}
     <option value="{{ column }}">{{ column }}</option>

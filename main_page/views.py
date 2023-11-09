@@ -13,7 +13,8 @@ from .utils import (
 from .forms import UploadFileForm, ParagraphErrorList
 from .models import Action
 from django.contrib import messages
-
+import re
+import json
 
 
 def main_page(request):
@@ -344,7 +345,7 @@ def edit_data(request):
                         print(f"Error processing column {column}: {e}")
 
 
-        if action == 'replace_symbol':
+        elif action == 'replace_symbol':
             columns_to_replace = request.POST.getlist('columns_to_replace')
             old_symbol = request.POST.get('old_symbol')
             new_symbol = request.POST.get('new_symbol')
@@ -370,6 +371,57 @@ def edit_data(request):
                     except Exception as e:
                         print(f"Error processing column {column}: {e}")
             
+
+        elif action == 'validate_data':
+            columns_to_validate = request.POST.getlist('columns_to_validate')
+            validation_type = request.POST.get('validation_type')
+            regex_pattern = request.POST.get('regex_pattern')
+            ignore_whitespace = 'ignore_whitespace' in request.POST
+            apply_to_all = '__all__' in columns_to_validate
+
+            if apply_to_all:
+                columns_to_validate = df_v3.columns.tolist()
+
+            invalid_rows = {}
+
+            for column in columns_to_validate:
+                if column in df_v3.columns:
+                    column_series = df_v3[column].fillna('').astype(str)
+                    invalid_rows[column] = []
+
+                    for index, value in column_series.items():
+                        if ignore_whitespace:
+                            value = value.replace(' ', '')
+
+                        if validation_type == 'letters' and not value.isalpha():
+                            invalid_rows[column].append(index)
+                        elif validation_type == 'numbers' and not value.isdigit():
+                            invalid_rows[column].append(index)
+                        elif validation_type == 'no_specials' and not value.isalnum():
+                            invalid_rows[column].append(index)
+                        elif validation_type == 'regex' and not re.match(regex_pattern, value):
+                            invalid_rows[column].append(index)
+
+            # Process and display invalid rows as needed
+            print(f"Invalid rows: {invalid_rows}")
+
+        elif action == 'check_duplicates':
+            columns_to_check = request.POST.getlist('columns_to_check_duplicates')
+            if columns_to_check:
+                if '__all__' in columns_to_check:
+                    columns_to_check = df_v3.columns.tolist()
+
+                duplicates = df_v3[df_v3.duplicated(subset=columns_to_check, keep=False)]
+                duplicates.sort_values(by=columns_to_check, inplace=True)
+
+                # Convert DataFrame to JSON
+                duplicates_json = duplicates.to_json(orient='records')
+
+                # Set the JSON data in the session
+                request.session['duplicates_json'] = duplicates_json
+            print(f"Found {len(duplicates)} duplicates")
+                    
+
         save_dataframe(df_v3, temp_file_path)
         return redirect('edit_data')
     
@@ -382,6 +434,8 @@ def edit_data(request):
         'table': dataframe_to_html(df_v3, classes='table table-striped'),
         'original_file_name': os.path.basename(file_path),
         'df_v3': df_v3,  # Pass the DataFrame to the template context
+        'duplicates_json': request.session.get('duplicates_json', '[]'),  # Pass the duplicates as JSON
+        #'showing_duplicates': 'duplicates_json' in request.session and bool(request.session['duplicates_json'])
     }
     
     return render(request, '4_edit_data.html', context)

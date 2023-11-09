@@ -3,7 +3,9 @@
 <div class="container">
     <form method="post" action="{% url 'edit_data' %}">
       {% csrf_token %}
+
       <!-- Form for deleting data based on a delimiter -->
+      <h2>Delete values before/after specific symbol</h2>
       <select name="columns_to_modify" multiple>
         <option value="__all__">--ALL COLUMNS--</option> <!-- Special value to indicate all columns -->
         {% for column in df_v3.columns %}
@@ -22,7 +24,7 @@
       <br><br>
     
     <!-- New form for replacing symbols in a column -->
-    
+    <h2>Replace symbols</h2>
         <select name="columns_to_replace" multiple>
             <option value="__all__">--ALL COLUMNS--</option> <!-- Special value to indicate all columns -->
           {% for column in df_v3.columns %}
@@ -37,14 +39,69 @@
         <button type="submit" name="action" value="replace_symbol">Replace Symbol</button>
     <br><br>
 
+<!-- Form for Data Validation -->
+<h2>Validate data</h2>
+    <select name="columns_to_validate" multiple>
+      <option value="__all__">--ALL COLUMNS--</option> <!-- Special value to indicate all columns -->
+      {% for column in df_v3.columns %}
+        <option value="{{ column }}">{{ column }}</option>
+      {% endfor %}
+    </select>
+    <select name="validation_type"  id="validation_type">
+      <option value="letters">Only Letters</option>
+      <option value="numbers">Only Numbers</option>
+      <option value="no_specials">No Special Characters</option>
+      <option value="regex">Match Regex</option>
+    </select>
+    <!-- Regex input field, initially hidden -->
+    <input type="text" name="regex_pattern" id="regex_pattern" placeholder="Regex, e.g. [a-zA-Z]+" style="display: none;">
+    <input type="checkbox" name="ignore_whitespace" id="ignore_whitespace" checked>
+    <label for="ignore_whitespace">Ignore Whitespace</label>
+    <button type="submit" name="action" value="validate_data">Validate Data</button>
+
+  <br><br>
+
+  <h2>Find Duplicates</h2>
+<select name="columns_to_check_duplicates" multiple>
+    <option value="__all__">--ALL COLUMNS--</option>
+    {% for column in df_v3.columns %}
+        <option value="{{ column }}">{{ column }}</option>
+    {% endfor %}
+</select>
+<button type="submit" name="action" value="check_duplicates">Find Duplicates</button>
 
 
       </form>
       <br><br>
 
 
-    <div class="scrollable-table">
-        {{ table|safe }}
-    </div>
+    {% if showing_duplicates %}
+      <!-- Display duplicates with checkmarks -->
+      <form id="duplicatesForm" method="post" action="{% url 'edit_data' %}">
+          {% csrf_token %}
+          <div class="scrollable-table" id="duplicates-table">
+              <!-- JavaScript will populate this with duplicate rows -->
+          </div>
+          <button type="button" onclick="deleteSelected()">Delete Selected</button>
+          <button type="submit" name="action" value="show_all">Show All</button>
+      </form>
+  {% else %}
+      <div class="scrollable-table">
+          {{ table|safe }}
+      </div>
+  {% endif %}
 </div>
+
+
 {% endblock content %}
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Check if showing duplicates
+        if ("{{ showing_duplicates }}") {
+            let duplicates = JSON.parse('{{ duplicates_json|escapejs }}');
+            renderDuplicates(duplicates);
+        }
+    });
+</script>
+{% endblock %}
