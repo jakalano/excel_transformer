@@ -30,9 +30,9 @@ pip freeze > requirements.txt
 - fix split_column on repeating symbols (e.g., "aaaaa" split with value aa creates three new columns: *empty* | *empty* | a )
 - merge_columns no longer renames the column with the user-given custom name, defaults to merged_column
 - add "delete original columns" option to merge_columns
-- add_column is now broken, doesn't do anything
 - add "trim spaces" function
 - implement visual feedback to validate_data and check_duplicates
+
 
 
 # error log fixed
@@ -40,3 +40,6 @@ pip freeze > requirements.txt
 - remove empty NaN columns
 - move the save dataframe function from views to utils
 - fix how numbers are displayed
+- add_column is now broken, doesn't do anything
+- split input submissions to separate forms
+- include a display cutoff point in the case of extremely long column names

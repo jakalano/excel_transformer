@@ -10,12 +10,29 @@
   flex: 1;
 }
 
+.column-selector {
+  max-width: 400px;
+  overflow-y: auto;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 
 .scrollable-table {
   max-height: 700px; 
   overflow-x: auto;  
   overflow-y: auto; 
   display: block;
+}
+
+.scrollable-table table td,
+.scrollable-table table th {
+  max-width: 400px;
+
+}
+
+.table thead th {
+  text-align: center;
 }
 
 #summary-table {

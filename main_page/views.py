@@ -137,7 +137,12 @@ def summary(request):
     if request.method == 'POST':
         # delete all empty rows
         if 'remove_empty_rows' in request.POST:
+            initial_row_count = df_v1.shape[0]
             df_v1 = remove_empty_rows(df_v1)
+            final_row_count = df_v1.shape[0]
+            rows_removed = initial_row_count - final_row_count
+
+            messages.success(request, f'{rows_removed} empty rows removed.')
 
             record_action(        
                 action_type='remove_empty_rows',
@@ -148,8 +153,13 @@ def summary(request):
            
         # delete selected columns
         if 'remove_empty_cols' in request.POST:
+            initial_col_count = df_v1.shape[1]
             cols_to_delete = request.POST.getlist('remove_empty_cols')
             df_v1 = df_v1.drop(columns=cols_to_delete)
+            final_col_count = df_v1.shape[1]
+            cols_removed = initial_col_count - final_col_count
+
+            messages.success(request, f'{cols_removed} empty columns removed.')
             record_action(        
                     action_type='remove_empty_cols',
                     parameters={'cols_to_delete': cols_to_delete},
@@ -228,11 +238,11 @@ def edit_columns(request):
     if request.method == 'POST':
         action = request.POST.get('action')
         if action == 'add_column':
-            # Handle adding a new column
             new_column_name = request.POST.get('new_column_name')
+            print(f"New column name: {new_column_name}")  # Debugging line
             if new_column_name:
                 df_v2[new_column_name] = None
-            
+            messages.success(request, f'Column "{new_column_name}" added successfully.')
             record_action(
                 action_type='add_column',
                 parameters={'new_column_name': new_column_name},
@@ -243,10 +253,10 @@ def edit_columns(request):
 
 
             # Handle deleting selected columns
-        if action == 'delete_columns':
+        elif action == 'delete_columns':
             columns_to_delete = request.POST.getlist('columns_to_delete')
             df_v2.drop(columns=columns_to_delete, inplace=True)
-
+            messages.success(request, f'{len(columns_to_delete)} columns deleted successfully.')
             record_action(
                 action_type='delete_columns',
                 parameters={'columns_to_delete': columns_to_delete},
@@ -255,7 +265,7 @@ def edit_columns(request):
             )
 
 
-        if action == 'fill_column':
+        elif action == 'fill_column':
             column_to_fill = request.POST.get('column_to_fill')
             fill_value = request.POST.get('fill_value')
             fill_option = request.POST.get('fill_option')
@@ -265,6 +275,7 @@ def edit_columns(request):
                     df_v2[column_to_fill] = fill_value
                 elif fill_option == 'empty':
                     df_v2[column_to_fill].fillna(fill_value, inplace=True)
+            messages.success(request, f'Column "{column_to_fill}" filled successfully with "{fill_value}".')
 
             record_action(
                 action_type='fill_column',
@@ -278,7 +289,7 @@ def edit_columns(request):
             )
 
 
-        if action == 'split_column':
+        elif action == 'split_column':
             column_to_split = request.POST.get('column_to_split')
             split_value = request.POST.get('split_value')
             delete_original = 'delete_original' in request.POST
@@ -293,7 +304,7 @@ def edit_columns(request):
                 # If user opted to delete the original column, drop it
                 if delete_original:
                     df_v2.drop(columns=[column_to_split], inplace=True)
-
+            messages.success(request, f'Column "{column_to_split}" split successfully.')
             record_action(
                 action_type='split_column',
                 parameters={
@@ -306,10 +317,10 @@ def edit_columns(request):
             )
 
 
-        if action == 'merge_columns':
+        elif action == 'merge_columns':
             columns_to_merge = request.POST.getlist('columns_to_merge')
             merge_separator = request.POST.get('merge_separator', '')
-            new_column_name = request.POST.get('new_column_name')
+            new_column_name = request.POST.get('new_merge_column_name')
 
             if not new_column_name:
                 new_column_name = 'merged_column'
@@ -317,7 +328,7 @@ def edit_columns(request):
             if columns_to_merge:
                 # Perform the merge operation
                 df_v2[new_column_name] = df_v2[columns_to_merge].astype(str).apply(merge_separator.join, axis=1)
-
+            messages.success(request, f'Columns merged into "{new_column_name}" successfully.')
             record_action(
                 action_type='merge_columns',
                 parameters={
@@ -330,14 +341,14 @@ def edit_columns(request):
             )
 
 
-        if action == 'rename_column':
+        elif action == 'rename_column':
             column_to_rename = request.POST.get('column_to_rename')
-            new_column_name = request.POST.get('new_column_name')
+            new_column_name = request.POST.get('new_renamed_column_name')
 
             if column_to_rename in df_v2.columns and new_column_name:
                 df_v2.rename(columns={column_to_rename: new_column_name}, inplace=True)
                 save_dataframe(df_v2, temp_file_path)
-
+            messages.success(request, f'Column renamed to "{new_column_name}" successfully.')
             record_action(
                 action_type='rename_column',
                 parameters={
@@ -405,7 +416,7 @@ def edit_data(request):
                                 # print(f"After operation: {df_v3[column].head()}")
                     except Exception as e:
                         print(f"Error processing column {column}: {e}")
-
+            messages.success(request, f'Data deleted successfully based on your criteria.')
             record_action(
                 action_type='delete_data',
                 parameters={
@@ -444,7 +455,7 @@ def edit_data(request):
                         #print(f"After operation: {df_v3[column].head()}")
                     except Exception as e:
                         print(f"Error processing column {column}: {e}")
-
+            messages.success(request, f'Symbols replaced successfully.')
             record_action(
                 action_type='replace_symbol',
                 parameters={
