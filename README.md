@@ -25,8 +25,14 @@ pip freeze > requirements.txt
 - fix undo
 - add action recording for every action
 - wrap each action in a collapsible wrapper to declutter the views?
-- implement better data manipulation for column merge in cases of all values NaN or some values NaN
+- implement better data manipulation for column merge in cases of all values NaN or some values NaN. currently merging | *empty* | *empty* | a | results in nan/nan/a
 - disappearing pop-up after each action about how many values were changed
+- fix split_column on repeating symbols (e.g., "aaaaa" split with value aa creates three new columns: *empty* | *empty* | a )
+- merge_columns no longer renames the column with the user-given custom name, defaults to merged_column
+- add "delete original columns" option to merge_columns
+- add_column is now broken, doesn't do anything
+- add "trim spaces" function
+- implement visual feedback to validate_data and check_duplicates
 
 
 # error log fixed

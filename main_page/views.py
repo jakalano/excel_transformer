@@ -232,12 +232,27 @@ def edit_columns(request):
             new_column_name = request.POST.get('new_column_name')
             if new_column_name:
                 df_v2[new_column_name] = None
+            
+            record_action(
+                action_type='add_column',
+                parameters={'new_column_name': new_column_name},
+                user=request.user,
+                session_id=request.session.session_key,
+            )
+
 
 
             # Handle deleting selected columns
         if action == 'delete_columns':
             columns_to_delete = request.POST.getlist('columns_to_delete')
             df_v2.drop(columns=columns_to_delete, inplace=True)
+
+            record_action(
+                action_type='delete_columns',
+                parameters={'columns_to_delete': columns_to_delete},
+                user=request.user,
+                session_id=request.session.session_key,
+            )
 
 
         if action == 'fill_column':
@@ -250,6 +265,18 @@ def edit_columns(request):
                     df_v2[column_to_fill] = fill_value
                 elif fill_option == 'empty':
                     df_v2[column_to_fill].fillna(fill_value, inplace=True)
+
+            record_action(
+                action_type='fill_column',
+                parameters={
+                    'column_to_fill': column_to_fill,
+                    'fill_value': fill_value,
+                    'fill_option': fill_option
+                },
+                user=request.user,
+                session_id=request.session.session_key,
+            )
+
 
         if action == 'split_column':
             column_to_split = request.POST.get('column_to_split')
@@ -267,6 +294,18 @@ def edit_columns(request):
                 if delete_original:
                     df_v2.drop(columns=[column_to_split], inplace=True)
 
+            record_action(
+                action_type='split_column',
+                parameters={
+                    'column_to_split': column_to_split,
+                    'split_value': split_value,
+                    'delete_original': delete_original
+                },
+                user=request.user,
+                session_id=request.session.session_key,
+            )
+
+
         if action == 'merge_columns':
             columns_to_merge = request.POST.getlist('columns_to_merge')
             merge_separator = request.POST.get('merge_separator', '')
@@ -279,6 +318,18 @@ def edit_columns(request):
                 # Perform the merge operation
                 df_v2[new_column_name] = df_v2[columns_to_merge].astype(str).apply(merge_separator.join, axis=1)
 
+            record_action(
+                action_type='merge_columns',
+                parameters={
+                    'columns_to_merge': columns_to_merge,
+                    'merge_separator': merge_separator,
+                    'new_column_name': new_column_name
+                },
+                user=request.user,
+                session_id=request.session.session_key,
+            )
+
+
         if action == 'rename_column':
             column_to_rename = request.POST.get('column_to_rename')
             new_column_name = request.POST.get('new_column_name')
@@ -286,6 +337,17 @@ def edit_columns(request):
             if column_to_rename in df_v2.columns and new_column_name:
                 df_v2.rename(columns={column_to_rename: new_column_name}, inplace=True)
                 save_dataframe(df_v2, temp_file_path)
+
+            record_action(
+                action_type='rename_column',
+                parameters={
+                    'column_to_rename': column_to_rename,
+                    'new_column_name': new_column_name
+                },
+                user=request.user,
+                session_id=request.session.session_key,
+            )
+
             
         save_dataframe(df_v2, temp_file_path)
         return redirect('edit_columns')
@@ -344,6 +406,18 @@ def edit_data(request):
                     except Exception as e:
                         print(f"Error processing column {column}: {e}")
 
+            record_action(
+                action_type='delete_data',
+                parameters={
+                    'columns_to_modify': columns_to_modify,
+                    'delimiter': delimiter,
+                    'delete_option': delete_option
+                },
+                user=request.user,
+                session_id=request.session.session_key,
+            )
+
+
 
         elif action == 'replace_symbol':
             columns_to_replace = request.POST.getlist('columns_to_replace')
@@ -370,6 +444,19 @@ def edit_data(request):
                         #print(f"After operation: {df_v3[column].head()}")
                     except Exception as e:
                         print(f"Error processing column {column}: {e}")
+
+            record_action(
+                action_type='replace_symbol',
+                parameters={
+                    'columns_to_replace': columns_to_replace if not apply_to_all else 'All Columns',
+                    'old_symbol': old_symbol,
+                    'new_symbol': new_symbol,
+                    'case_sensitive': case_sensitive
+                },
+                user=request.user,
+                session_id=request.session.session_key,
+            )
+
             
 
         elif action == 'validate_data':
