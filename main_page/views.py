@@ -178,6 +178,7 @@ def summary(request):
         # Logic to delete the first X rows
         if num_rows_to_delete_start > 0:
             df_v1 = df_v1.iloc[num_rows_to_delete_start:]
+            messages.success(request, f'First {num_rows_to_delete_start} deleted successfully.')
             record_action(        
                     action_type='delete_first_X_rows',
                     parameters={'num_rows_to_delete_start': num_rows_to_delete_start},
@@ -202,6 +203,7 @@ def summary(request):
         # Logic to delete the last X rows
         if num_rows_to_delete_end > 0:
             df_v1 = df_v1.iloc[:-num_rows_to_delete_end]
+            messages.success(request, f'Last {num_rows_to_delete_end} deleted successfully.')
             record_action(        
                     action_type='delete_last_X_rows',
                     parameters={'num_rows_to_delete_end': num_rows_to_delete_end},
@@ -348,7 +350,7 @@ def edit_columns(request):
             if column_to_rename in df_v2.columns and new_column_name:
                 df_v2.rename(columns={column_to_rename: new_column_name}, inplace=True)
                 save_dataframe(df_v2, temp_file_path)
-            messages.success(request, f'Column renamed to "{new_column_name}" successfully.')
+            messages.success(request, f'Column "{column_to_rename}" renamed to "{new_column_name}" successfully.')
             record_action(
                 action_type='rename_column',
                 parameters={
