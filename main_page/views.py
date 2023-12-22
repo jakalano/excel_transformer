@@ -87,46 +87,157 @@ def undo_last_action(request):
 
     # applies all actions to the df
     for action in actions:
-        df = apply_action(df, action.action_type, action.parameters)
+        df, current_view = apply_action(df, action.action_type, action.parameters)
+        if current_view is None:
+            # If current_view is None, log an error and break out of the loop
+            print(f"Error: current_view is None for action {action.action_type}")
+            break
 
-    # saves the modified df back to the temporary file path
+    # Check if current_view is not None before redirecting
+    if current_view is not None:
+        # saves the modified df back to the temporary file path
+        temp_file_path = request.session.get('temp_file_path')
+        save_dataframe(df, temp_file_path)
+        
+        # Redirect to the current view
+        return redirect(current_view)
+    else:
+        # Handle the case where current_view is None
+        messages.error(request, "An error occurred while undoing the last action.")
+        return redirect('main_page')  # Redirect to a default or safe view
+    
+
+    """ ############ V2 of undo table refresh :(
+    # applies all actions to the df
+    for action in actions:
+        df, _ = apply_action(df, action.action_type, action.parameters)
+        # No need to check the returned view here, as we use the current_view from the request
+
+    # Save the modified dataframe
     temp_file_path = request.session.get('temp_file_path')
     save_dataframe(df, temp_file_path)
 
-    # instead of redirecting returns a JsonResponse with the necessary data
-    updated_table_html = dataframe_to_html(df)
-    return JsonResponse({'status': 'success', 'updated_table': updated_table_html})
+    # Redirect to the current view
+    return redirect(current_view)
+    """
 
 def apply_action(df, action_type, parameters):
     try:
         print(f"Applying {action_type} with {parameters}")
+        current_view = None  # Variable to hold the current view name
 
-        if action_type == 'remove_empty_rows':
-            return remove_empty_rows(df)
+        # Define view names for each action type
+        summary_view_actions = ['remove_empty_rows', 'remove_empty_cols', 'delete_first_X_rows', 'replace_header', 'delete_last_X_rows']
+        edit_columns_view_actions = ['add_column', 'delete_columns', 'fill_column', 'split_column', 'merge_columns', 'rename_column']
+        edit_data_view_actions = ['delete_data', 'replace_symbol']
+
+        # action handlers for summary view
+        if action_type in summary_view_actions:
+            current_view = 'summary'
+
+            if action_type == 'remove_empty_rows':
+                df = remove_empty_rows(df)
+                return df, current_view
+            elif action_type == 'remove_empty_cols':
+                cols_to_delete = parameters.get('cols_to_delete')
+                df = df.drop(cols_to_delete, axis=1)
+                return df, current_view
+            elif action_type == 'delete_first_X_rows':
+                num_rows_to_delete_start = int(parameters.get('num_rows_to_delete_start', 0))
+                df = df.iloc[num_rows_to_delete_start:]
+                return df, current_view
+            elif action_type == 'replace_header':
+                df.columns = df.iloc[0]
+                df = df.iloc[1:]
+                return df, current_view
+            elif action_type == 'delete_last_X_rows':
+                num_rows_to_delete_end = int(parameters.get('num_rows_to_delete_end', 0))
+                if num_rows_to_delete_end:
+                    df = df.iloc[:-num_rows_to_delete_end]
+                else:
+                    df
+                return df, current_view
+
+        # action handlers for edit_columns view
+        elif action_type in edit_columns_view_actions:
+            current_view = 'edit_columns'
         
-        elif action_type == 'remove_empty_cols':
-            cols_to_delete = parameters.get('cols_to_delete')
-            return df.drop(cols_to_delete, axis=1)
-        
-        elif action_type == 'delete_first_X_rows':
-            num_rows_to_delete_start = int(parameters.get('num_rows_to_delete_start', 0))
-            return df.iloc[num_rows_to_delete_start:]
-        
-        elif action_type == 'replace_header':
-            df.columns = df.iloc[0]
-            return df.iloc[1:]
-        
-        elif action_type == 'delete_last_X_rows':
-            num_rows_to_delete_end = int(parameters.get('num_rows_to_delete_end', 0))
-            return df.iloc[:-num_rows_to_delete_end] if num_rows_to_delete_end else df
-        
+            if action_type == 'add_column':
+                new_column_name = parameters.get('new_column_name')
+                df[new_column_name] = None
+                return df, current_view
+
+            elif action_type == 'delete_columns':
+                columns_to_delete = parameters.get('columns_to_delete')
+                df = df.drop(columns=columns_to_delete, axis=1)
+                return df, current_view
+
+            elif action_type == 'fill_column':
+                column_to_fill = parameters.get('column_to_fill')
+                fill_value = parameters.get('fill_value')
+                fill_option = parameters.get('fill_option')
+                if fill_option == 'all':
+                    df[column_to_fill] = fill_value
+                elif fill_option == 'empty':
+                    df[column_to_fill].fillna(fill_value, inplace=True)
+                return df, current_view
+
+            elif action_type == 'split_column':
+                column_to_split = parameters.get('column_to_split')
+                split_value = parameters.get('split_value')
+                split_data = df[column_to_split].str.split(split_value, expand=True)
+                for i, new_column in enumerate(split_data.columns):
+                    new_column_name = f"{column_to_split}_split_{i+1}"
+                    df[new_column_name] = split_data[new_column]
+                if parameters.get('delete_original'):
+                    df.drop(columns=[column_to_split], inplace=True)
+                return df, current_view
+
+            elif action_type == 'merge_columns':
+                columns_to_merge = parameters.get('columns_to_merge')
+                merge_separator = parameters.get('merge_separator', '')
+                new_column_name = parameters.get('new_column_name', 'merged_column')
+                df[new_column_name] = df[columns_to_merge].astype(str).apply(merge_separator.join, axis=1)
+                return df, current_view
+
+            elif action_type == 'rename_column':
+                column_to_rename = parameters.get('column_to_rename')
+                new_column_name = parameters.get('new_column_name')
+                df.rename(columns={column_to_rename: new_column_name}, inplace=True)
+                return df, current_view
+
+        # action handlers for edit_data view
+        elif action_type in edit_data_view_actions:
+            current_view = 'edit_data'
+            if action_type == 'delete_data':
+                # Check if there is a backup available
+                backup_path = Action.backup_data_path
+                if backup_path:
+                    df_backup = pd.read_csv(backup_path)
+                    # logic to restore the original data from df_backup
+                    for column in df_backup.columns:
+                        df[column] = df_backup[column]
+                return df, current_view
+
+            elif action_type == 'replace_symbol':
+                columns_to_replace = parameters.get('columns_to_replace')
+                old_symbol = parameters.get('new_symbol')  # Swap old and new symbols
+                new_symbol = parameters.get('old_symbol')  # for undoing
+                case_sensitive = parameters.get('case_sensitive')
+                for column in columns_to_replace:
+                    if case_sensitive:
+                        df[column] = df[column].str.replace(old_symbol, new_symbol, regex=True)
+                    else:
+                        df[column] = df[column].str.replace(old_symbol, new_symbol, case=False, regex=True)
+                return df, current_view
+
         else:
             print(f"Unknown action type: {action_type}")
-            return df
+        return df, current_view
     
     except Exception as e:
         print(f"Error applying action {action_type} with parameters {parameters}: {str(e)}")
-        return df
+        return df, None
 
 def summary(request):
     temp_file_path = request.session.get('temp_file_path')
@@ -165,7 +276,7 @@ def summary(request):
                 )
            
         # deletes selected columns
-        if 'remove_empty_cols' in request.POST:
+        elif 'remove_empty_cols' in request.POST:
             initial_col_count = df_v1.shape[1]
             cols_to_delete = request.POST.getlist('remove_empty_cols')
             df_v1 = df_v1.drop(columns=cols_to_delete)
@@ -263,6 +374,7 @@ def edit_columns(request):
         messages.error(request, "The file you're working on could not be found.")
         return redirect('main_page')  # Redirect to a safe page
     df_v2 = load_dataframe_from_file(temp_file_path)
+
     if request.method == 'POST':
         action = request.POST.get('action')
         if action == 'add_column':
@@ -459,7 +571,9 @@ def edit_data(request):
                                 # print(f"After operation: {df_v3[column].head()}")
                     except Exception as e:
                         print(f"Error processing column {column}: {e}")
+            
             messages.success(request, f'Data deleted successfully based on your criteria.')
+            df_backup = df_v3[columns_to_modify].copy()  # Backup the original data
             record_action(
                 uploaded_file=uploaded_file_instance,        
                 action_type='delete_data',
@@ -470,6 +584,7 @@ def edit_data(request):
                 },
                 user=request.user,
                 session_id=request.session.session_key,
+                df_backup=df_backup,
             )
 
 

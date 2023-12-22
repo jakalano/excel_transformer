@@ -83,9 +83,9 @@ def remove_empty_rows(df):
     """Remove all rows from a DataFrame that contain only NaN values."""
     return df.dropna(how='all')
 
-def record_action(uploaded_file, action_type, parameters, user, session_id):
+def record_action(uploaded_file, action_type, parameters, user, session_id, df_backup=None):
     """
-    Record an action performed by a user.
+    Record an action performed by a user, including a backup of the DataFrame if provided.
     """
     # Check if the user is authenticated
     if user.is_authenticated:
@@ -97,13 +97,22 @@ def record_action(uploaded_file, action_type, parameters, user, session_id):
     uploaded_file_instance = UploadedFile.objects.get(file=uploaded_file)
 
 
-    return Action.objects.create(
+    action = Action.objects.create(
         uploaded_file=uploaded_file_instance,
         user=user_instance,
         action_type=action_type,
         parameters=parameters,
         session_id=session_id,
     )
+
+    # If there's a backup DataFrame, store it
+    if df_backup is not None:
+        backup_path = f'backups/{action.id}_backup.csv'  # Define a path for backup
+        df_backup.to_csv(backup_path)
+        action.backup_data_path = backup_path  # Assuming Action model has a field for this
+        action.save()
+
+    return action
 
 
 def save_as_template(user, actions, template_name):

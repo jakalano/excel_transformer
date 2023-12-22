@@ -93,6 +93,56 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
 
+    //////////// undo table autorefresh V2 :(
+    
+
+    /*
+    ///////////// undo functionality /////////////
+    let undoButton = document.getElementById('undo-button');
+    if (undoButton) {
+        undoButton.addEventListener('click', async function(event) {
+            event.preventDefault();
+            console.log("Undo button clicked!");
+
+            // Get the current view from the URL
+            let currentView = window.location.pathname.split('/').pop();
+
+            try {
+                let undoUrl = '/undo/?current_view=' + currentView; // Append current view to the undo URL
+
+                let response = await fetch(undoUrl, {  // Use the new undoUrl with the query parameter
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken,
+                    },
+                    body: JSON.stringify({
+                        'session_key': sessionKey,
+                    })
+                });
+
+                if(!response.ok) {
+                    throw new Error('Network response was not ok: ' + response.statusText);
+                }
+
+                let data = await response.json();
+                if (data.status === 'success') {
+                    // Update the table with the new HTML
+                    document.getElementById('summary-table').innerHTML = data.updated_table;
+                } else {
+                    console.error('Error from server:', data.error);
+                }
+            } catch(error) {
+                console.error('There was a problem with the fetch operation:', error.message);
+            }
+        });
+    } else {
+        console.error('Undo button not found!');
+    }
+
+
+    */
+
 
     ///////////// regex text field appears only when regex selected in edit_data /////////////
 
