@@ -36,6 +36,7 @@ class Action(models.Model):
     user = models.ForeignKey(User, null=True, on_delete=models.SET_NULL)  # Link action to user
     session_id = models.CharField(max_length=256, null=True)  # Store session ID
     backup_data_path = models.CharField(max_length=1024, null=True, blank=True)
+    undone = models.BooleanField(default=False)  # tracks if an action is undone
 
     def __str__(self):
         return f"{self.action_type} - {self.timestamp}"

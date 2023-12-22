@@ -80,7 +80,10 @@ def undo_last_action(request):
     actions_count = Action.objects.filter(session_id=request.session.session_key, uploaded_file=current_file).count()
     if actions_count > 1:
         last_action = Action.objects.filter(session_id=request.session.session_key, uploaded_file=current_file).latest('timestamp')
-        actions = Action.objects.filter(session_id=request.session.session_key, uploaded_file=current_file).exclude(id=last_action.id)
+            # Set the undone flag to True for the last action
+        last_action.undone = True
+        last_action.save()
+        actions = Action.objects.filter(session_id=request.session.session_key, uploaded_file=current_file, undone=False)
 
     else:
         actions = Action.objects.none()
@@ -89,9 +92,8 @@ def undo_last_action(request):
     for action in actions:
         df, current_view = apply_action(df, action.action_type, action.parameters)
         if current_view is None:
-            # If current_view is None, log an error and break out of the loop
-            print(f"Error: current_view is None for action {action.action_type}")
-            break
+            break  # If current_view is None, an error occurred, so break out of the loop
+
 
     # Check if current_view is not None before redirecting
     if current_view is not None:
@@ -104,22 +106,7 @@ def undo_last_action(request):
     else:
         # Handle the case where current_view is None
         messages.error(request, "An error occurred while undoing the last action.")
-        return redirect('main_page')  # Redirect to a default or safe view
-    
-
-    """ ############ V2 of undo table refresh :(
-    # applies all actions to the df
-    for action in actions:
-        df, _ = apply_action(df, action.action_type, action.parameters)
-        # No need to check the returned view here, as we use the current_view from the request
-
-    # Save the modified dataframe
-    temp_file_path = request.session.get('temp_file_path')
-    save_dataframe(df, temp_file_path)
-
-    # Redirect to the current view
-    return redirect(current_view)
-    """
+        return redirect('summary')  # Redirect to a default or safe view
 
 def apply_action(df, action_type, parameters):
     try:
