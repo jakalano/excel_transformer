@@ -6,12 +6,13 @@ from django.shortcuts import render, redirect
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.urls import resolve
 from django.template import loader
+from django.conf import settings
 from .utils import (
     load_dataframe_from_file, save_dataframe,
     dataframe_to_html, remove_empty_rows,record_action
 )
 from .forms import UploadFileForm, ParagraphErrorList
-from .models import Action
+from .models import Action, UploadedFile
 from django.contrib import messages
 import re
 import json
@@ -26,12 +27,12 @@ def main_page(request):
     if request.method == 'POST':
         form = UploadFileForm(request.POST, request.FILES, error_class=ParagraphErrorList)
         if form.is_valid():
-            uploaded_file = form.save()  # Save the original file
+            uploaded_file = form.save()  # saves the original file
             file_path = uploaded_file.file.path
             request.session['file_path'] = file_path
             df_orig = load_dataframe_from_file(file_path)
             
-            # Create a modified copy
+            # creates a modified copy
             file_dir, file_name = os.path.split(file_path)
             file_root, _ = os.path.splitext(file_name)
             temp_file_path = os.path.join(file_dir, f"TEMP_{file_root}.csv")
@@ -45,7 +46,7 @@ def main_page(request):
             return redirect('summary')
             
         else:
-            context['form'] = form  # Add the invalid form to the context so errors can be displayed
+            context['form'] = form  # adds the invalid form to the context so errors can be displayed
             return render(request, '1_index.html', context)
 
     form = UploadFileForm()
@@ -57,43 +58,44 @@ def undo_last_action(request):
     print("Undo view accessed")
     print(f"Session Original File Path: {request.session.get('file_path')}")
 
-    # Load the original file
+    # loads the orig file
     original_file_path = request.session.get('file_path')
     if original_file_path is None:
-        # Handle the error: log it, inform the user, etc.
         print("Original file path is None!")
         return JsonResponse({'status': 'error', 'error': 'Original file path not found'}, status=500)
 
+        # Extract the relative path using MEDIA_ROOT
+    relative_path = os.path.relpath(original_file_path, settings.MEDIA_ROOT).replace('\\', '/')
+
+    try:
+        current_file = UploadedFile.objects.get(file=relative_path)
+    except UploadedFile.DoesNotExist:
+        # Handle the case where the UploadedFile instance doesn't exist
+        messages.error(request, "The file you're working on could not be found.")
+        return redirect('main_page')  # Redirect to a safe page
+
     df = load_dataframe_from_file(original_file_path)
 
-    # Get all actions for this session, excluding the last one
-    actions_count = Action.objects.filter(session_id=request.session.session_key).count()
+    # Get all actions for this session and current file, excluding the last one
+    actions_count = Action.objects.filter(session_id=request.session.session_key, uploaded_file=current_file).count()
     if actions_count > 1:
-        last_action = Action.objects.filter(session_id=request.session.session_key).latest('timestamp')
-        actions = Action.objects.filter(session_id=request.session.session_key).exclude(id=last_action.id)
+        last_action = Action.objects.filter(session_id=request.session.session_key, uploaded_file=current_file).latest('timestamp')
+        actions = Action.objects.filter(session_id=request.session.session_key, uploaded_file=current_file).exclude(id=last_action.id)
 
     else:
         actions = Action.objects.none()
 
-    # Apply all actions to the dataframe
+    # applies all actions to the df
     for action in actions:
         df = apply_action(df, action.action_type, action.parameters)
 
-    # Save the modified dataframe back to the temporary file path
+    # saves the modified df back to the temporary file path
     temp_file_path = request.session.get('temp_file_path')
     save_dataframe(df, temp_file_path)
 
-    # Instead of redirecting, return a JsonResponse with the necessary data
-    # For example, return the updated HTML table or any other data that the client-side needs to update the UI
+    # instead of redirecting returns a JsonResponse with the necessary data
     updated_table_html = dataframe_to_html(df)
     return JsonResponse({'status': 'success', 'updated_table': updated_table_html})
-
-# def undo_last_action(request):
-#     try:
-#         # your undo logic here...
-#         return JsonResponse({'status': 'ok'})
-#     except Exception as e:
-#         return JsonResponse({'status': 'error', 'error': str(e)}, status=500)
 
 def apply_action(df, action_type, parameters):
     try:
@@ -130,12 +132,22 @@ def summary(request):
     temp_file_path = request.session.get('temp_file_path')
     file_path = request.session.get('file_path')
     df_v1 = load_dataframe_from_file(temp_file_path)
-    print(temp_file_path)
-    # Identify empty columns
+    print(file_path)
+        # Extract the relative path using MEDIA_ROOT
+    relative_path = os.path.relpath(file_path, settings.MEDIA_ROOT).replace('\\', '/')
+    print(relative_path)
+
+    try:
+        uploaded_file_instance = UploadedFile.objects.get(file=relative_path)
+    except UploadedFile.DoesNotExist:
+        # Handle the case where the UploadedFile instance doesn't exist
+        messages.error(request, "The file you're working on could not be found.")
+        return redirect('main_page')  # Redirect to a safe page
+    # identifies emty columns
     empty_cols = df_v1.columns[df_v1.isna().all()].tolist()
 
     if request.method == 'POST':
-        # delete all empty rows
+        # deletes all empty rows
         if 'remove_empty_rows' in request.POST:
             initial_row_count = df_v1.shape[0]
             df_v1 = remove_empty_rows(df_v1)
@@ -144,14 +156,15 @@ def summary(request):
 
             messages.success(request, f'{rows_removed} empty rows removed.')
 
-            record_action(        
+            record_action(
+                uploaded_file=uploaded_file_instance,        
                 action_type='remove_empty_rows',
                 parameters={},
                 user=request.user,
                 session_id=request.session.session_key,
                 )
            
-        # delete selected columns
+        # deletes selected columns
         if 'remove_empty_cols' in request.POST:
             initial_col_count = df_v1.shape[1]
             cols_to_delete = request.POST.getlist('remove_empty_cols')
@@ -161,6 +174,7 @@ def summary(request):
 
             messages.success(request, f'{cols_removed} empty columns removed.')
             record_action(        
+                    uploaded_file=uploaded_file_instance,
                     action_type='remove_empty_cols',
                     parameters={'cols_to_delete': cols_to_delete},
                     user=request.user,
@@ -171,40 +185,43 @@ def summary(request):
         replace_header = 'replace_header' in request.POST
         num_rows_to_delete_end = request.POST.get('num_rows_to_delete_end')
 
-        # Check if num_rows_to_delete_start is not None and convert to int, else default to 0
+        # check if num_rows_to_delete_start is not None and convert to int, else default to 0
         num_rows_to_delete_start = int(num_rows_to_delete_start) if num_rows_to_delete_start else 0
         
 
-        # Logic to delete the first X rows
+        # deletes the first X rows
         if num_rows_to_delete_start > 0:
             df_v1 = df_v1.iloc[num_rows_to_delete_start:]
             messages.success(request, f'First {num_rows_to_delete_start} deleted successfully.')
             record_action(        
+                    uploaded_file=uploaded_file_instance,
                     action_type='delete_first_X_rows',
                     parameters={'num_rows_to_delete_start': num_rows_to_delete_start},
                     user=request.user,
                     session_id=request.session.session_key,
                     )
         
-        # If replace_header is True, set the dataframe columns to the first row's values
+        # if replace_header is True, set the df columns to the first row's values
         if replace_header:
             df_v1.columns = df_v1.iloc[0]
             df_v1 = df_v1.iloc[1:]
             record_action(        
+                    uploaded_file=uploaded_file_instance,
                     action_type='replace_header',
                     parameters={},
                     user=request.user,
                     session_id=request.session.session_key,
                     )
 
-        # Check if num_rows_to_delete_end is not None and convert to int, else default to 0
+        # checks if num_rows_to_delete_end is not None and convert to int, else default to 0
         num_rows_to_delete_end = int(num_rows_to_delete_end) if num_rows_to_delete_end else 0
         
-        # Logic to delete the last X rows
+        # deletes the last X rows
         if num_rows_to_delete_end > 0:
             df_v1 = df_v1.iloc[:-num_rows_to_delete_end]
             messages.success(request, f'Last {num_rows_to_delete_end} deleted successfully.')
             record_action(        
+                    uploaded_file=uploaded_file_instance,
                     action_type='delete_last_X_rows',
                     parameters={'num_rows_to_delete_end': num_rows_to_delete_end},
                     user=request.user,
@@ -212,9 +229,9 @@ def summary(request):
                     )
         
         temp_file_path = save_dataframe(df_v1, temp_file_path)
-        # Update the session with the new file path
+        # updates the session with the new file path
         request.session['temp_file_path'] = temp_file_path
-        # Redirect to avoid resubmit on refresh
+        # redirects to avoid resubmit on refresh
         return redirect('summary')
 
     context = {
@@ -236,16 +253,26 @@ def summary(request):
 def edit_columns(request):
     temp_file_path = request.session.get('temp_file_path')
     file_path = request.session.get('file_path')
+    # Extract the relative path using MEDIA_ROOT
+    relative_path = os.path.relpath(file_path, settings.MEDIA_ROOT).replace('\\', '/')
+
+    try:
+        uploaded_file_instance = UploadedFile.objects.get(file=relative_path)
+    except UploadedFile.DoesNotExist:
+        # Handle the case where the UploadedFile instance doesn't exist
+        messages.error(request, "The file you're working on could not be found.")
+        return redirect('main_page')  # Redirect to a safe page
     df_v2 = load_dataframe_from_file(temp_file_path)
     if request.method == 'POST':
         action = request.POST.get('action')
         if action == 'add_column':
             new_column_name = request.POST.get('new_column_name')
-            print(f"New column name: {new_column_name}")  # Debugging line
+            print(f"New column name: {new_column_name}")  
             if new_column_name:
                 df_v2[new_column_name] = None
             messages.success(request, f'Column "{new_column_name}" added successfully.')
             record_action(
+                uploaded_file=uploaded_file_instance,        
                 action_type='add_column',
                 parameters={'new_column_name': new_column_name},
                 user=request.user,
@@ -254,12 +281,13 @@ def edit_columns(request):
 
 
 
-            # Handle deleting selected columns
+            # handles deleting selected columns
         elif action == 'delete_columns':
             columns_to_delete = request.POST.getlist('columns_to_delete')
             df_v2.drop(columns=columns_to_delete, inplace=True)
             messages.success(request, f'{len(columns_to_delete)} columns deleted successfully.')
             record_action(
+                uploaded_file=uploaded_file_instance,        
                 action_type='delete_columns',
                 parameters={'columns_to_delete': columns_to_delete},
                 user=request.user,
@@ -280,6 +308,7 @@ def edit_columns(request):
             messages.success(request, f'Column "{column_to_fill}" filled successfully with "{fill_value}".')
 
             record_action(
+                uploaded_file=uploaded_file_instance,        
                 action_type='fill_column',
                 parameters={
                     'column_to_fill': column_to_fill,
@@ -297,17 +326,18 @@ def edit_columns(request):
             delete_original = 'delete_original' in request.POST
 
             if column_to_split in df_v2.columns and split_value:
-                # Perform the split operation
+                # performs the split operation
                 split_data = df_v2[column_to_split].str.split(split_value, expand=True)
                 for i, new_column in enumerate(split_data.columns):
                     new_column_name = f"{column_to_split}_split_{i+1}"
                     df_v2[new_column_name] = split_data[new_column]
 
-                # If user opted to delete the original column, drop it
+                # if user opted to delete the original column, drop it
                 if delete_original:
                     df_v2.drop(columns=[column_to_split], inplace=True)
             messages.success(request, f'Column "{column_to_split}" split successfully.')
             record_action(
+                uploaded_file=uploaded_file_instance,        
                 action_type='split_column',
                 parameters={
                     'column_to_split': column_to_split,
@@ -328,10 +358,11 @@ def edit_columns(request):
                 new_column_name = 'merged_column'
 
             if columns_to_merge:
-                # Perform the merge operation
+                # performs the merge operation
                 df_v2[new_column_name] = df_v2[columns_to_merge].astype(str).apply(merge_separator.join, axis=1)
             messages.success(request, f'Columns merged into "{new_column_name}" successfully.')
             record_action(
+                uploaded_file=uploaded_file_instance,        
                 action_type='merge_columns',
                 parameters={
                     'columns_to_merge': columns_to_merge,
@@ -352,6 +383,7 @@ def edit_columns(request):
                 save_dataframe(df_v2, temp_file_path)
             messages.success(request, f'Column "{column_to_rename}" renamed to "{new_column_name}" successfully.')
             record_action(
+                uploaded_file=uploaded_file_instance,        
                 action_type='rename_column',
                 parameters={
                     'column_to_rename': column_to_rename,
@@ -371,7 +403,7 @@ def edit_columns(request):
         'next_page_url': 'edit_data',
         'table': dataframe_to_html(df_v2, classes='table table-striped'),
         'original_file_name': os.path.basename(file_path),
-        'df_v2': df_v2,  # Pass the DataFrame to the template context'
+        'df_v2': df_v2,  # passes the df to the template context
     }
     return render(request, '3_edit_columns.html', context)
 
@@ -379,11 +411,20 @@ def edit_data(request):
 
     temp_file_path = request.session.get('temp_file_path')
     file_path = request.session.get('file_path')
+    # Extract the relative path using MEDIA_ROOT
+    relative_path = os.path.relpath(file_path, settings.MEDIA_ROOT).replace('\\', '/')
+
+    try:
+        uploaded_file_instance = UploadedFile.objects.get(file=relative_path)
+    except UploadedFile.DoesNotExist:
+        # Handle the case where the UploadedFile instance doesn't exist
+        messages.error(request, "The file you're working on could not be found.")
+        return redirect('main_page')  # Redirect to a safe page
     df_v3 = load_dataframe_from_file(temp_file_path)
     if request.method == 'POST':
-        print("POST request received")  # This should always print when a form is submitted
+        print("POST request received")  # this should always print when a form is submitted
         action = request.POST.get('action')
-        print(f"Action received: {action}")  # This should print the action value
+        print(f"Action received: {action}")  # prints the action value
 
 
         if action == 'delete_data':
@@ -394,32 +435,33 @@ def edit_data(request):
             apply_to_all = '__all__' in columns_to_modify
 
             if apply_to_all:
-                columns_to_modify = df_v3.columns.tolist()  # List all columns if '--ALL COLUMNS--' is selected
+                columns_to_modify = df_v3.columns.tolist()  # lists all columns if '--ALL COLUMNS--' is selected
 
             for column in columns_to_modify:
                 if column in df_v3.columns:
-                    # Convert entire column to strings, replacing NaN with empty strings
+                    # converts entire column to strings, replacing NaN with empty strings
                     column_series = df_v3[column].fillna('').astype(str)
                     try:
                         # print(f"Before operation: {column_series.head()}")
                         if include_delimiter:
-                            # If the user wants to delete the delimiter along with the data
+                            # if the user wants to delete the delimiter along with the data
                             if delete_option == 'before':
                                 df_v3[column] = column_series.apply(lambda x: x.split(delimiter)[-1] if delimiter in x else x)
                             elif delete_option == 'after':
                                 df_v3[column] = column_series.apply(lambda x: x.split(delimiter)[0] if delimiter in x else x)
                         else:
-                            # If the user wants to keep the delimiter
+                            # if the user wants to keep the delimiter
                             if delete_option == 'before':
                                 df_v3[column] = column_series.apply(lambda x: x.split(delimiter, 1)[-1] if delimiter in x else x)
                             elif delete_option == 'after':
-                                # Append the delimiter after the operation if it's not to be deleted
+                                # appends the delimiter after the operation if it's not to be deleted
                                 df_v3[column] = column_series.apply(lambda x: delimiter + x.split(delimiter, 1)[-1] if delimiter in x else x)
                                 # print(f"After operation: {df_v3[column].head()}")
                     except Exception as e:
                         print(f"Error processing column {column}: {e}")
             messages.success(request, f'Data deleted successfully based on your criteria.')
             record_action(
+                uploaded_file=uploaded_file_instance,        
                 action_type='delete_data',
                 parameters={
                     'columns_to_modify': columns_to_modify,
@@ -436,12 +478,12 @@ def edit_data(request):
             columns_to_replace = request.POST.getlist('columns_to_replace')
             old_symbol = request.POST.get('old_symbol')
             new_symbol = request.POST.get('new_symbol')
-            # Default to False if the checkbox is not checked
+            # defaults to False if the checkbox is not checked
             case_sensitive = 'case_sensitive' in request.POST
             apply_to_all = '__all__' in columns_to_replace
 
             if apply_to_all:
-                columns_to_replace = df_v3.columns.tolist()  # List all columns if '--ALL COLUMNS--' is selected
+                columns_to_replace = df_v3.columns.tolist()  # lists all columns if '--ALL COLUMNS--' is selected
 
 
             for column in columns_to_replace:
@@ -449,16 +491,17 @@ def edit_data(request):
                     try:
                         #print(f"Before operation: {df_v3[column].head()}")
                         if case_sensitive:
-                            # Case sensitive replacement
+                            # case sensitive replacement
                             df_v3[column] = df_v3[column].str.replace(old_symbol, new_symbol, regex=True)
                         else:
-                            # Case insensitive replacement
+                            # case insensitive replacement
                             df_v3[column] = df_v3[column].str.replace(old_symbol, new_symbol, case=False, regex=True)
                         #print(f"After operation: {df_v3[column].head()}")
                     except Exception as e:
                         print(f"Error processing column {column}: {e}")
             messages.success(request, f'Symbols replaced successfully.')
             record_action(
+                uploaded_file=uploaded_file_instance,        
                 action_type='replace_symbol',
                 parameters={
                     'columns_to_replace': columns_to_replace if not apply_to_all else 'All Columns',
@@ -502,7 +545,7 @@ def edit_data(request):
                         elif validation_type == 'regex' and not re.match(regex_pattern, value):
                             invalid_rows[column].append(index)
 
-            # Process and display invalid rows as needed
+            # TODO process and display invalid rows in the table
             print(f"Invalid rows: {invalid_rows}")
 
         elif action == 'check_duplicates':
@@ -514,13 +557,13 @@ def edit_data(request):
                 duplicates = df_v3[df_v3.duplicated(subset=columns_to_check, keep=False)]
                 duplicates.sort_values(by=columns_to_check, inplace=True)
 
-                # Convert DataFrame to JSON
+                # converts df to JSON
                 duplicates_json = duplicates.to_json(orient='records')
 
-                # Set the JSON data in the session
+                # sets the JSON data in the session
                 request.session['duplicates_json'] = duplicates_json
             print(f"Found {len(duplicates)} duplicates")
-                    
+            # TODO implement filter for all duplicate values in the table        
 
         save_dataframe(df_v3, temp_file_path)
         return redirect('edit_data')
@@ -533,8 +576,8 @@ def edit_data(request):
         'next_page_url': 'download',
         'table': dataframe_to_html(df_v3, classes='table table-striped'),
         'original_file_name': os.path.basename(file_path),
-        'df_v3': df_v3,  # Pass the DataFrame to the template context
-        'duplicates_json': request.session.get('duplicates_json', '[]'),  # Pass the duplicates as JSON
+        'df_v3': df_v3,  # Pass the df to the template context
+        'duplicates_json': request.session.get('duplicates_json', '[]'),  # pass the duplicates as JSON
         #'showing_duplicates': 'duplicates_json' in request.session and bool(request.session['duplicates_json'])
     }
     
@@ -569,7 +612,7 @@ def download(request):
         print(df.head())
         file_name_no_ext, _ = os.path.splitext(original_file_name)
 
-        # Generate the new filename
+        # generate the new filename
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
         new_file_name = f"{file_name_no_ext}_EDITED_{timestamp}"
         print(f"New file name: {new_file_name}")
@@ -587,13 +630,13 @@ def download(request):
                 response = HttpResponse(f, content_type='application/xml')
         
             else:
-                # Handle unexpected format
+                # handle unexpected format
                 return HttpResponse("Unexpected format", status=400)
                 
         response['Content-Disposition'] = f'attachment; filename="{new_file_name}.{file_format}"'
         return response
     else:
-        # If no format is specified, render the HTML page
+        # if no format is specified, render the HTML page
         return render(request, '5_download.html', context)
 
 

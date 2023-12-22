@@ -3,7 +3,7 @@ import csv
 import re
 from datetime import datetime
 import pandas as pd
-from .models import Action, Template
+from .models import Action, Template, UploadedFile
 
 def detect_delimiter(file_path, num_lines=5):
     # detect the delimiter of a csv file
@@ -83,7 +83,7 @@ def remove_empty_rows(df):
     """Remove all rows from a DataFrame that contain only NaN values."""
     return df.dropna(how='all')
 
-def record_action(action_type, parameters, user, session_id):
+def record_action(uploaded_file, action_type, parameters, user, session_id):
     """
     Record an action performed by a user.
     """
@@ -91,9 +91,14 @@ def record_action(action_type, parameters, user, session_id):
     if user.is_authenticated:
         user_instance = user
     else:
-        user_instance = None  # or a default user if you have one
+        user_instance = None  
+
+    # Fetch the UploadedFile instance
+    uploaded_file_instance = UploadedFile.objects.get(file=uploaded_file)
+
 
     return Action.objects.create(
+        uploaded_file=uploaded_file_instance,
         user=user_instance,
         action_type=action_type,
         parameters=parameters,

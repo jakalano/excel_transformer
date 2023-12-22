@@ -1,7 +1,7 @@
 console.log('main.js loaded');
 function handleSummaryPageActions() {
-    // Check if you're on the summary page
-    if (window.location.pathname === '/summary/') { // Adjust this path according to your Django URL configuration for the summary page
+    // check if you're on the summary pages
+    if (window.location.pathname === '/summary/') { // 
         console.log("Summary page");
         let nextPageLink = document.querySelector('.page-link[href="/edit_data/"]');
         let removeRowsCheckbox = document.getElementById('removeRowsCheckbox');
@@ -58,12 +58,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let undoButton = document.getElementById('undo-button');
     if (undoButton) {
         undoButton.addEventListener('click', async function(event) {
-            // Prevent form submission
             event.preventDefault();
             console.log("Undo button clicked!");
-
-            // Initialize responseClone outside of the try block
-            let responseClone;
 
             try {
                 let response = await fetch('/undo/', {
@@ -77,23 +73,19 @@ document.addEventListener('DOMContentLoaded', function() {
                     })
                 });
 
-                // Clone the response right after fetching
-                responseClone = response.clone();
-
                 if(!response.ok) {
                     throw new Error('Network response was not ok: ' + response.statusText);
                 }
 
                 let data = await response.json();
-                // Handle your data...
+                if (data.status === 'success') {
+                    // Update the table with the new HTML
+                    document.getElementById('summary-table').innerHTML = data.updated_table;
+                } else {
+                    console.error('Error from server:', data.error);
+                }
             } catch(error) {
                 console.error('There was a problem with the fetch operation:', error.message);
-                // Use the cloned response to read the text without consuming the original response
-                if(responseClone) {
-                    responseClone.text().then(text => console.error('Response text:', text));
-                } else {
-                    console.error('Response clone is not available.');
-                }
             }
         });
     } else {
@@ -107,7 +99,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var validationTypeSelect = document.getElementById('validation_type');
     var regexInput = document.getElementById('regex_pattern');
 
-    // Function to show/hide regex input
+    // function to show/hide regex input
     function toggleRegexInput() {
         if (validationTypeSelect.value === 'regex') {
             regexInput.style.display = 'block';
@@ -116,10 +108,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Event listener for change on validation type dropdown
+    // event listener for change on validation type dropdown
     validationTypeSelect.addEventListener('change', toggleRegexInput);
 
-    // Initial check in case of page reload
+    // initial check in case of page reload
     toggleRegexInput();
 
 
@@ -128,7 +120,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     
     function renderDuplicates(duplicates) {
-        let table = document.getElementById('duplicates-table'); // Assume you have a table with this ID
+        let table = document.getElementById('duplicates-table');
         let thead = table.createTHead();
         let tbody = table.createTBody();
     
@@ -136,7 +128,7 @@ document.addEventListener('DOMContentLoaded', function() {
         thead.innerHTML = '';
         tbody.innerHTML = '';
     
-        // Create headers
+        // creates headers
         let row = thead.insertRow();
         if (duplicates.length > 0) {
             Object.keys(duplicates[0]).forEach(key => {
@@ -166,20 +158,20 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Check if showing duplicates
+    // checks if showing duplicates
     if ("{{ showing_duplicates }}") {
         let duplicates = JSON.parse('{{ request.session.duplicates|escapejs }}');
         renderDuplicates(duplicates);
     }
 
-    // Function to handle deletion of selected duplicates
+    // handle deletion of selected duplicates
     function deleteSelected() {
         let checkboxes = document.querySelectorAll('.duplicate-checkbox');
         let selectedIndices = Array.from(checkboxes)
                                   .filter(checkbox => checkbox.checked)
                                   .map(checkbox => checkbox.dataset.rowIndex);
         
-        // Assuming you have a form with an ID 'delete-duplicates-form'
+        
         let form = document.getElementById('delete-duplicates-form');
         let input = document.createElement('input');
         input.type = 'hidden';
@@ -189,7 +181,7 @@ document.addEventListener('DOMContentLoaded', function() {
         form.submit();
     }
 
-    // Add event listener to your delete button
+    // adds event listener to your delete button
     let deleteButton = document.getElementById('delete-duplicates-button');
     if (deleteButton) {
         deleteButton.addEventListener('click', deleteSelected);
@@ -205,6 +197,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 
-// Call the function when the document is ready
+// call the function when the document is ready
 document.addEventListener('DOMContentLoaded', handleSummaryPageActions);
 
