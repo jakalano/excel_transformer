@@ -1,5 +1,13 @@
 {% extends "base.html" %} {% block content %}
 <div class="container">
+  <br>
+  {% for message in messages %}
+  <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+      {{ message }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+{% endfor %}
+<br>
   <form action="{% url 'download' %}" method="get">
     <!-- <label for="enforce_utf8">Enforce UTF-8 Encoding:</label>
     <input type="checkbox" id="enforce_utf8" name="enforce_utf8" checked>
@@ -13,6 +21,16 @@
     </select><br><br>
     <input type="submit" value="Download">
 </form>
+<!-- Template Saving Form -->
+<div class="container">
+  <h3>Save Your Actions as a Template</h3>
+  <form action="{% url 'save_template' %}" method="post">
+      {% csrf_token %}
+      <label for="templateName">Template Name:</label>
+      <input type="text" id="template_name" name="template_name" required>
+      <input type="submit" value="Save Template">
+  </form>
+</div>
 
 </div>
 

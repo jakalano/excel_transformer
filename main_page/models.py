@@ -42,6 +42,9 @@ class Action(models.Model):
         return f"{self.action_type} - {self.timestamp}"
     
 class Template(models.Model):
-    actions = models.ManyToManyField(Action)
     name = models.CharField(max_length=100)
     user = models.ForeignKey(User, on_delete=models.CASCADE)  # Link template to user
+    actions = models.JSONField()  # Stores list of actions
+
+    def __str__(self):
+        return self.name

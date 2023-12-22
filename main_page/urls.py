@@ -9,6 +9,7 @@ urlpatterns = [
     path('edit_data/', views.edit_data, name='edit_data'),
     path('edit_columns/', views.edit_columns, name='edit_columns'),
     path('undo/', views.undo_last_action, name='undo_last_action'),
+    path('save_template/', views.save_template, name='save_template'),
     path('download/', views.download, name='download'),
     path('login/', auth_views.LoginView.as_view(), name='login'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),

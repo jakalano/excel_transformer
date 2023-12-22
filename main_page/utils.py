@@ -69,9 +69,6 @@ def save_dataframe(df, save_path, file_format=None):
     
     return save_path
 
-
-
-
 def dataframe_to_html(df, classes=None):
     """Convert a DataFrame to an HTML table."""
     df.columns = [col for col, dtype in zip(df.columns, df.dtypes)]
@@ -122,3 +119,32 @@ def save_as_template(user, actions, template_name):
     template = Template.objects.create(name=template_name, user=user)
     template.actions.add(*actions)
     return template
+
+def get_actions_for_session(session_key, uploaded_file, exclude_last_action=False):
+    """
+    Retrieves actions for a given session and uploaded file.
+    Optionally excludes the last action.
+    """
+    actions = Action.objects.filter(session_id=session_key, uploaded_file=uploaded_file)
+    if exclude_last_action and actions.exists():
+        last_action = actions.latest('timestamp')
+        actions = actions.exclude(id=last_action.id)
+    return actions
+
+def action_to_dict(action):
+    """
+    Converts an Action model instance into a dictionary.
+
+    Args:
+        action (Action): The Action model instance.
+
+    Returns:
+        dict: A dictionary representation of the Action.
+    """
+    return {
+        'action_type': action.action_type,
+        'parameters': action.parameters,
+        'timestamp': action.timestamp.isoformat(),  # Convert datetime to string
+        'undone': action.undone,
+        # Add any other relevant fields here
+    }

@@ -9,11 +9,12 @@ from django.template import loader
 from django.conf import settings
 from .utils import (
     load_dataframe_from_file, save_dataframe,
-    dataframe_to_html, remove_empty_rows,record_action
+    dataframe_to_html, remove_empty_rows,record_action, get_actions_for_session, save_as_template, action_to_dict
 )
 from .forms import UploadFileForm, ParagraphErrorList
-from .models import Action, UploadedFile
+from .models import Action, UploadedFile, Template
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 import re
 import json
 
@@ -56,57 +57,51 @@ def main_page(request):
 
 def undo_last_action(request):
     print("Undo view accessed")
-    print(f"Session Original File Path: {request.session.get('file_path')}")
-
-    # loads the orig file
     original_file_path = request.session.get('file_path')
+
     if original_file_path is None:
         print("Original file path is None!")
         return JsonResponse({'status': 'error', 'error': 'Original file path not found'}, status=500)
 
-        # Extract the relative path using MEDIA_ROOT
+    # Extract the relative path using MEDIA_ROOT
     relative_path = os.path.relpath(original_file_path, settings.MEDIA_ROOT).replace('\\', '/')
 
     try:
         current_file = UploadedFile.objects.get(file=relative_path)
     except UploadedFile.DoesNotExist:
-        # Handle the case where the UploadedFile instance doesn't exist
         messages.error(request, "The file you're working on could not be found.")
-        return redirect('main_page')  # Redirect to a safe page
+        return redirect('main_page')
 
+    # Retrieve the df from the file
     df = load_dataframe_from_file(original_file_path)
 
-    # Get all actions for this session and current file, excluding the last one
-    actions_count = Action.objects.filter(session_id=request.session.session_key, uploaded_file=current_file).count()
-    if actions_count > 1:
+    # uses utils.py function to get actions
+    actions = get_actions_for_session(request.session.session_key, current_file, exclude_last_action=True)
+    
+    if actions.exists():
+        # Set the undone flag to True for the last action
         last_action = Action.objects.filter(session_id=request.session.session_key, uploaded_file=current_file).latest('timestamp')
-            # Set the undone flag to True for the last action
         last_action.undone = True
         last_action.save()
-        actions = Action.objects.filter(session_id=request.session.session_key, uploaded_file=current_file, undone=False)
+
+        # Apply the actions
+        for action in actions:
+            df, current_view = apply_action(df, action.action_type, action.parameters)
+            if current_view is None:
+                break
 
     else:
-        actions = Action.objects.none()
-
-    # applies all actions to the df
-    for action in actions:
-        df, current_view = apply_action(df, action.action_type, action.parameters)
-        if current_view is None:
-            break  # If current_view is None, an error occurred, so break out of the loop
-
+        current_view = None
 
     # Check if current_view is not None before redirecting
     if current_view is not None:
-        # saves the modified df back to the temporary file path
+        # Save the modified DataFrame back to the temporary file path
         temp_file_path = request.session.get('temp_file_path')
         save_dataframe(df, temp_file_path)
-        
-        # Redirect to the current view
         return redirect(current_view)
     else:
-        # Handle the case where current_view is None
         messages.error(request, "An error occurred while undoing the last action.")
-        return redirect('summary')  # Redirect to a default or safe view
+        return redirect('summary')
 
 def apply_action(df, action_type, parameters):
     try:
@@ -225,6 +220,44 @@ def apply_action(df, action_type, parameters):
     except Exception as e:
         print(f"Error applying action {action_type} with parameters {parameters}: {str(e)}")
         return df, None
+
+@login_required(login_url="/login/")
+def save_template(request):
+    if request.method == 'POST':
+        original_file_path = request.session.get('file_path')
+        relative_path = os.path.relpath(original_file_path, settings.MEDIA_ROOT).replace('\\', '/')
+        try:
+            current_file = UploadedFile.objects.get(file=relative_path)
+            actions = get_actions_for_session(request.session.session_key, current_file)
+            actions_data = [action_to_dict(action) for action in actions]  # Convert actions to a dict representation
+            print(actions_data)
+
+            # Check if actions_data is not empty
+            if not actions_data:
+                messages.error(request, "No actions to save in the template.")
+                return redirect('download')
+
+            template_name = request.POST.get('template_name')
+            # Create and save the template with actions_data
+            template = Template.objects.create(name=template_name, user=request.user, actions=actions_data)
+            messages.success(request, f'Template "{template_name}" saved.')
+        except UploadedFile.DoesNotExist:
+            messages.error(request, "File not found.")
+        return redirect('download')
+    else:
+        messages.error(request, 'Invalid request')
+        return redirect('download')
+
+def apply_template(request, template_id, file_path):
+    template = Template.objects.get(id=template_id)
+    df = load_dataframe_from_file(file_path)
+
+    for action in template.actions:
+        action_type = action['action_type']
+        parameters = action['parameters']
+        df = apply_action(df, action_type, parameters)
+
+    # Save or display the modified DataFrame
 
 def summary(request):
     temp_file_path = request.session.get('temp_file_path')
