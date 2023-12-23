@@ -20,6 +20,7 @@ def get_upload_path(instance, filename):
 class UploadedFile(models.Model):
     file = models.FileField(upload_to=get_upload_path, validators=[validate_file_extension])
     uploaded_at = models.DateTimeField(auto_now_add=True)
+    
 
     def __str__(self):
         return self.file.name
@@ -44,6 +45,7 @@ class Action(models.Model):
 class Template(models.Model):
     name = models.CharField(max_length=100)
     user = models.ForeignKey(User, on_delete=models.CASCADE)  # Link template to user
+    original_headers = models.JSONField(default=list)  # Stores original file's headers
     actions = models.JSONField()  # Stores list of actions
 
     def __str__(self):

@@ -145,6 +145,4 @@ def action_to_dict(action):
         'action_type': action.action_type,
         'parameters': action.parameters,
         'timestamp': action.timestamp.isoformat(),  # Convert datetime to string
-        'undone': action.undone,
-        # Add any other relevant fields here
     }

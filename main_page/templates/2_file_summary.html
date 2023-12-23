@@ -79,6 +79,22 @@
 <button type="submit">Submit</button>
 {% endif %}
 <br><br> 
+<div>
+    <form action="{% url 'apply_template' %}" method="post">
+      {% csrf_token %}
+      <label for="template_id">Choose a template to apply:</label>
+      <select name="template_id" id="template_id">
+        {% for template in templates %}
+          <option value="{{ template.id }}">{{ template.name }}</option>
+        {% empty %}
+          <option>No templates available</option>
+        {% endfor %}
+      </select>
+      <button type="submit">Apply Template</button>
+    </form>
+  </div>
+<br><br> 
+
 <script type="text/javascript">
     var csrfToken = '{{ csrf_token }}';
     var sessionKey = '{{ request.session.session_key }}';

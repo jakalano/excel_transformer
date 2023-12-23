@@ -228,9 +228,11 @@ def save_template(request):
         relative_path = os.path.relpath(original_file_path, settings.MEDIA_ROOT).replace('\\', '/')
         try:
             current_file = UploadedFile.objects.get(file=relative_path)
+            df = load_dataframe_from_file(original_file_path)  # Assuming this function returns a pandas DataFrame
+            original_headers = df.columns.tolist()  # Extract headers from the DataFrame
+
             actions = get_actions_for_session(request.session.session_key, current_file)
-            actions_data = [action_to_dict(action) for action in actions]  # Convert actions to a dict representation
-            print(actions_data)
+            actions_data = [action_to_dict(action) for action in actions if not action.undone]  # Convert actions to a dict representation
 
             # Check if actions_data is not empty
             if not actions_data:
@@ -238,8 +240,13 @@ def save_template(request):
                 return redirect('download')
 
             template_name = request.POST.get('template_name')
-            # Create and save the template with actions_data
-            template = Template.objects.create(name=template_name, user=request.user, actions=actions_data)
+            # Create and save the template with actions_data and original_headers
+            template = Template.objects.create(
+                name=template_name, 
+                user=request.user, 
+                actions=actions_data, 
+                original_headers=original_headers
+            )
             messages.success(request, f'Template "{template_name}" saved.')
         except UploadedFile.DoesNotExist:
             messages.error(request, "File not found.")
@@ -248,16 +255,47 @@ def save_template(request):
         messages.error(request, 'Invalid request')
         return redirect('download')
 
-def apply_template(request, template_id, file_path):
-    template = Template.objects.get(id=template_id)
-    df = load_dataframe_from_file(file_path)
 
-    for action in template.actions:
-        action_type = action['action_type']
-        parameters = action['parameters']
-        df = apply_action(df, action_type, parameters)
+def apply_template(request):
+    if request.method == 'POST':
+        print("post request")
+        template_id = request.POST.get('template_id')
+        file_path = request.session.get('file_path')
+        print(f"applying {template_id} to {file_path}")
 
-    # Save or display the modified DataFrame
+        try:
+            template = Template.objects.get(id=template_id, user=request.user)
+            df = load_dataframe_from_file(file_path)
+
+            # Compare headers
+            current_headers = df.columns.tolist()
+            print(f"current headers: {current_headers}, original headers: {template.original_headers}")
+            if set(current_headers) != set(template.original_headers):
+                messages.error(request, "Headers of the current file do not match the template's original headers.")
+                return redirect('summary')
+
+            # Apply actions
+            for action in template.actions:
+                action_type = action['action_type']
+                parameters = action['parameters']
+                df = apply_action(df, action_type, parameters)
+
+            temp_file_path = request.session.get('temp_file_path')
+            save_dataframe(df, temp_file_path)
+            request.session['html_table'] = dataframe_to_html(df, classes='table table-striped')
+            messages.success(request, "Template applied successfully.")
+            return redirect('summary')
+
+        except Template.DoesNotExist:
+            messages.error(request, "Template not found or access denied.")
+            return redirect('summary')
+
+        except Exception as e:
+            messages.error(request, str(e))
+            return redirect('summary')
+
+    # Redirect if not a POST request
+    return redirect('summary')
 
 def summary(request):
     temp_file_path = request.session.get('temp_file_path')
@@ -267,6 +305,8 @@ def summary(request):
         # Extract the relative path using MEDIA_ROOT
     relative_path = os.path.relpath(file_path, settings.MEDIA_ROOT).replace('\\', '/')
     print(relative_path)
+    # Retrieve templates for the current user
+    user_templates = Template.objects.filter(user=request.user)
 
     try:
         uploaded_file_instance = UploadedFile.objects.get(file=relative_path)
@@ -374,6 +414,7 @@ def summary(request):
         'empty_cols': empty_cols,
         'table': dataframe_to_html(df_v1, classes='table table-striped'),
         'original_file_name': os.path.basename(file_path),
+        'templates': user_templates,
         'previous_page_url': 'main_page',
         'active_page': 'summary',
         'next_page_url': 'edit_columns',
