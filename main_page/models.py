@@ -18,7 +18,7 @@ def get_upload_path(instance, filename):
     return os.path.join(folder_name, f"{filename}")
 
 class UploadedFile(models.Model):
-    file = models.FileField(upload_to=get_upload_path, validators=[validate_file_extension])
+    file = models.FileField(upload_to=get_upload_path, validators=[validate_file_extension], max_length=255)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     
 
