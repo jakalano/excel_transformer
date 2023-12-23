@@ -1,4 +1,4 @@
-{% extends "base.html" %} 
+{% extends "base.html" %}
 {% load static %}
 
 
@@ -6,108 +6,113 @@
 
 
 <div class="row">
-  <div class="col-sm-6 mb-3 mb-sm-0">
-      <div class="card">
-          <div class="card-body">
-              <h5 class="card-title">File Details</h5>
-              <p class="card-text">Number of Columns: {{ num_cols }}</p>
-              <div class="dropdown">
-                  <button class="btn btn-secondary dropdown-toggle" type="button" id="columnDropdown" data-bs-toggle="dropdown"  aria-expanded="false">
-                      Column Names
-                  </button>
-                  <ul div class="dropdown-menu">
-                      {% for name in col_names %}
-                          <li><a class="dropdown-item">{{ name|slice:":50" }}{% if name|length > 50 %}...{% endif %}</a></li>
-                      {% endfor %}
-                  </ul>
-              </div>
-          </div>
-      </div>
-  </div>
-  <div class="col-sm-6">
-      <div class="card">
-          <div class="card-body">
-              <h5 class="card-title">Row Information</h5>
-              <p class="card-text">Number of Rows: {{ num_rows }}</p>
-          </div>
-      </div>
-  </div>
-<div> 
-    
-<br>
-    {% for message in messages %}
-    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    <div class="col-sm-6 mb-3 mb-sm-0">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">File Details</h5>
+                <p class="card-text">Number of Columns: {{ num_cols }}</p>
+                <div class="dropdown">
+                    <button class="btn btn-secondary dropdown-toggle" type="button" id="columnDropdown"
+                        data-bs-toggle="dropdown" aria-expanded="false">
+                        Column Names
+                    </button>
+                    <ul div class="dropdown-menu">
+                        {% for name in col_names %}
+                        <li><a class="dropdown-item">{{ name|slice:":50" }}{% if name|length > 50 %}...{% endif %}</a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
     </div>
-{% endfor %}
-<br>
+    <div class="col-sm-6">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Row Information</h5>
+                <p class="card-text">Number of Rows: {{ num_rows }}</p>
+            </div>
+        </div>
+    </div>
+    <div>
 
-    <form id="deleteRowsForm" action="{% url 'summary' %}" method="post">
-        {% csrf_token %}
-        <label for="num_rows_to_delete_start">Delete first </label>
-        <input type="number" name="num_rows_to_delete_start" id="num_rows_to_delete_start" min="0">
-        <label for="num_rows_to_delete_start"> rows</label><br>
-        
-        <input type="checkbox" name="replace_header" id="replace_header">
-        <label for="replace_header">Delete header too</label><br>
-        
-        <label for="num_rows_to_delete_end">Delete last </label>
-        <input type="number" name="num_rows_to_delete_end" id="num_rows_to_delete_end" min="1">
-        <label for="num_rows_to_delete_end"> rows</label><br>
-        
-        <button type="submit">Delete Rows</button>
-    </form>
-<br> <br>    
-<form id="removeEmptyForm" action="{% url 'summary' %}" method="post">
-  {% csrf_token %}
-  
-  {% if num_empty_rows > 0 %}
-  <label for="removeRowsCheckbox">There are {{ num_empty_rows }} empty rows. Delete them? </label>
-      <input type="checkbox" name="remove_empty_rows" id="removeRowsCheckbox"> 
-  <br><br>{% endif %}
-
-{% if empty_cols %}
-    
-    <label>There are {{ num_empty_cols }} empty columns. Select to delete: </label><br>
-    {% for col in empty_cols %}
-        <input type="checkbox" name="remove_empty_cols" value="{{ col }}"> {{ col }}<br>
-    {% endfor %}
-    
-    <br>{% endif %}
-{% if num_empty_cols > 0 or num_empty_rows > 0 %}
-<button type="submit">Submit</button>
-{% endif %}
-<br><br> 
-<div>
-    <form action="{% url 'apply_template' %}" method="post">
-      {% csrf_token %}
-      <label for="template_id">Choose a template to apply:</label>
-      <select name="template_id" id="template_id">
-        {% for template in templates %}
-          <option value="{{ template.id }}">{{ template.name }}</option>
-        {% empty %}
-          <option>No templates available</option>
+        <br>
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
         {% endfor %}
-      </select>
-      <button type="submit">Apply Template</button>
-    </form>
-  </div>
-<br><br> 
+        <br>
 
-<script type="text/javascript">
-    var csrfToken = '{{ csrf_token }}';
-    var sessionKey = '{{ request.session.session_key }}';
-</script>
-<script src="{% static 'js/main.js' %}" type="text/javascript"></script>
+        <form id="deleteRowsForm" action="{% url 'summary' %}" method="post">
+            {% csrf_token %}
+            <label for="num_rows_to_delete_start">Delete first </label>
+            <input type="number" name="num_rows_to_delete_start" id="num_rows_to_delete_start" min="0">
+            <label for="num_rows_to_delete_start"> rows</label><br>
 
-<button id="undo-button" class="btn btn-warning">Undo</button>
+            <input type="checkbox" name="replace_header" id="replace_header">
+            <label for="replace_header">Delete header too</label><br>
 
-</form>
-</div>
+            <label for="num_rows_to_delete_end">Delete last </label>
+            <input type="number" name="num_rows_to_delete_end" id="num_rows_to_delete_end" min="1">
+            <label for="num_rows_to_delete_end"> rows</label><br>
+
+            <button type="submit">Delete Rows</button>
+        </form>
+        <br> <br>
+        <form id="removeEmptyForm" action="{% url 'summary' %}" method="post">
+            {% csrf_token %}
+
+            {% if num_empty_rows > 0 %}
+            <label for="removeRowsCheckbox">There are {{ num_empty_rows }} empty rows. Delete them? </label>
+            <input type="checkbox" name="remove_empty_rows" id="removeRowsCheckbox">
+            <br><br>{% endif %}
+
+            {% if empty_cols %}
+
+            <label>There are {{ num_empty_cols }} empty columns. Select to delete: </label><br>
+            {% for col in empty_cols %}
+            <input type="checkbox" name="remove_empty_cols" value="{{ col }}"> {{ col }}<br>
+            {% endfor %}
+
+            <br>{% endif %}
+            {% if num_empty_cols > 0 or num_empty_rows > 0 %}
+            <button type="submit">Submit</button>
+            {% endif %}
+            <br><br>
+
+
+
+            <script type="text/javascript">
+                var csrfToken = '{{ csrf_token }}';
+                var sessionKey = '{{ request.session.session_key }}';
+            </script>
+            <script src="{% static 'js/main.js' %}" type="text/javascript"></script>
+
+            <button id="undo-button" class="btn btn-warning">Undo</button>
+
+        </form>
+        <br><br>
+        <form action="{% url 'apply_template' %}" method="post">
+            {% csrf_token %}
+            <label for="template_id">Choose a template to apply:</label>
+            <select name="template_id" id="template_id">
+                {% for template in templates %}
+                <option value="{{ template.id }}">{{ template.name }}</option>
+                {% empty %}
+                <option>No templates available</option>
+                {% endfor %}
+            </select>
+            <button type="submit">Apply Template</button>
+        </form>
+        <br><br>
+        
+    </div>
 </div>
 <div class="container">
-<div class="scrollable-table" id="summary-table">
-    {{ table|safe }}
-</div></div>
+    <div class="scrollable-table" id="summary-table">
+        {{ table|safe }}
+    </div>
+</div>
 {% endblock content %}

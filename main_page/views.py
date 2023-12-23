@@ -119,26 +119,26 @@ def apply_action(df, action_type, parameters):
 
             if action_type == 'remove_empty_rows':
                 df = remove_empty_rows(df)
-                return df, current_view
+                
             elif action_type == 'remove_empty_cols':
                 cols_to_delete = parameters.get('cols_to_delete')
                 df = df.drop(cols_to_delete, axis=1)
-                return df, current_view
+                
             elif action_type == 'delete_first_X_rows':
                 num_rows_to_delete_start = int(parameters.get('num_rows_to_delete_start', 0))
                 df = df.iloc[num_rows_to_delete_start:]
-                return df, current_view
+                
             elif action_type == 'replace_header':
                 df.columns = df.iloc[0]
                 df = df.iloc[1:]
-                return df, current_view
+                
             elif action_type == 'delete_last_X_rows':
                 num_rows_to_delete_end = int(parameters.get('num_rows_to_delete_end', 0))
                 if num_rows_to_delete_end:
                     df = df.iloc[:-num_rows_to_delete_end]
                 else:
                     df
-                return df, current_view
+                
 
         # action handlers for edit_columns view
         elif action_type in edit_columns_view_actions:
@@ -147,12 +147,12 @@ def apply_action(df, action_type, parameters):
             if action_type == 'add_column':
                 new_column_name = parameters.get('new_column_name')
                 df[new_column_name] = None
-                return df, current_view
+                
 
             elif action_type == 'delete_columns':
                 columns_to_delete = parameters.get('columns_to_delete')
                 df = df.drop(columns=columns_to_delete, axis=1)
-                return df, current_view
+                
 
             elif action_type == 'fill_column':
                 column_to_fill = parameters.get('column_to_fill')
@@ -162,7 +162,7 @@ def apply_action(df, action_type, parameters):
                     df[column_to_fill] = fill_value
                 elif fill_option == 'empty':
                     df[column_to_fill].fillna(fill_value, inplace=True)
-                return df, current_view
+                
 
             elif action_type == 'split_column':
                 column_to_split = parameters.get('column_to_split')
@@ -173,20 +173,20 @@ def apply_action(df, action_type, parameters):
                     df[new_column_name] = split_data[new_column]
                 if parameters.get('delete_original'):
                     df.drop(columns=[column_to_split], inplace=True)
-                return df, current_view
+                
 
             elif action_type == 'merge_columns':
                 columns_to_merge = parameters.get('columns_to_merge')
                 merge_separator = parameters.get('merge_separator', '')
                 new_column_name = parameters.get('new_column_name', 'merged_column')
                 df[new_column_name] = df[columns_to_merge].astype(str).apply(merge_separator.join, axis=1)
-                return df, current_view
+                
 
             elif action_type == 'rename_column':
                 column_to_rename = parameters.get('column_to_rename')
                 new_column_name = parameters.get('new_column_name')
                 df.rename(columns={column_to_rename: new_column_name}, inplace=True)
-                return df, current_view
+                
 
         # action handlers for edit_data view
         elif action_type in edit_data_view_actions:
@@ -199,7 +199,7 @@ def apply_action(df, action_type, parameters):
                     # logic to restore the original data from df_backup
                     for column in df_backup.columns:
                         df[column] = df_backup[column]
-                return df, current_view
+                
 
             elif action_type == 'replace_symbol':
                 columns_to_replace = parameters.get('columns_to_replace')
@@ -211,15 +211,15 @@ def apply_action(df, action_type, parameters):
                         df[column] = df[column].str.replace(old_symbol, new_symbol, regex=True)
                     else:
                         df[column] = df[column].str.replace(old_symbol, new_symbol, case=False, regex=True)
-                return df, current_view
+                
 
         else:
             print(f"Unknown action type: {action_type}")
-        return df, current_view
+        return df
     
     except Exception as e:
         print(f"Error applying action {action_type} with parameters {parameters}: {str(e)}")
-        return df, None
+        return df
 
 @login_required(login_url="/login/")
 def save_template(request):
@@ -260,12 +260,13 @@ def apply_template(request):
     if request.method == 'POST':
         print("post request")
         template_id = request.POST.get('template_id')
-        file_path = request.session.get('file_path')
-        print(f"applying {template_id} to {file_path}")
+        temp_file_path = request.session.get('temp_file_path')
+        print(f"applying {template_id} to {temp_file_path}")
 
         try:
             template = Template.objects.get(id=template_id, user=request.user)
-            df = load_dataframe_from_file(file_path)
+            df = load_dataframe_from_file(temp_file_path)
+            df = pd.DataFrame(df) if not isinstance(df, pd.DataFrame) else df
 
             # Compare headers
             current_headers = df.columns.tolist()
@@ -273,6 +274,8 @@ def apply_template(request):
             if set(current_headers) != set(template.original_headers):
                 messages.error(request, "Headers of the current file do not match the template's original headers.")
                 return redirect('summary')
+            else:
+                print("headers match")
 
             # Apply actions
             for action in template.actions:
