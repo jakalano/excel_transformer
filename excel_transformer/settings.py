@@ -141,3 +141,19 @@ if DEBUG:
     import mimetypes
     mimetypes.add_type("application/javascript", ".js", True)
 
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        '': {  # 'root' logger
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+    },
+}

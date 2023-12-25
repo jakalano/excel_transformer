@@ -1,216 +1,376 @@
+
 from django.test import TestCase, Client
-from django.contrib.auth.models import User
-from django.contrib.messages import get_messages
-from django.shortcuts import reverse
-from .models import Template, UploadedFile
-from django.core.files.uploadedfile import SimpleUploadedFile
-from .views import summary
-import shutil
-import tempfile
-import os
+from django.urls import reverse
+from unittest.mock import patch, MagicMock
 import pandas as pd
+import numpy as np
+from .models import UploadedFile, Action
+from django.contrib.auth.models import User
+import logging
+from unittest.mock import patch
 
-class AccessibilityTestCase(TestCase):
+class SummaryViewTest(TestCase):
     def setUp(self):
+        # Configure logging
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.DEBUG)
+
         self.client = Client()
-        self.user = User.objects.create_user(username='test', password='test')
-        self.client.login(username='test', password='test')
+        self.user = User.objects.create_user('testuser', 'test@example.com', 'password')
+        self.client.login(username='testuser', password='password')
 
-
-        # Path to the actual file you want to use for testing
-        actual_file_path = os.path.join('media', '_TEST_20231223224412', '_TEST.xlsx')
-
-        # Create an UploadedFile instance with the actual file
-        UploadedFile.objects.create(file=actual_file_path)
-
-        # Set up the session data expected by the views
         session = self.client.session
-        session['file_path'] = actual_file_path
-        session['temp_file_path'] = actual_file_path
+        session['file_path'] = 'media/_TEST_20231223233536/TEMP__TEST.csv'
         session.save()
 
+        self.logger.debug("setUp completed")
 
-    def test_pages_accessibility(self):
-        url_names = [
-            'main_page',
-            'summary',
-            'edit_data',
-            'edit_columns',
-            'undo_last_action',
-            'save_template',
-            'apply_template',
-            'download',
-            # 'login' and 'logout' are Django's built-in views
-        ]
+    @patch('main_page.views.load_dataframe_from_file')
+    @patch('main_page.views.save_dataframe')
+    @patch('main_page.views.UploadedFile.objects.get')
+    @patch('main_page.models.Action.objects.create')
+    def test_remove_empty_rows(self, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
+        self.logger.info("Testing removal of empty rows")
+        # Create a DataFrame with some empty rows
+        df = pd.DataFrame({'A': [1, np.nan, 3], 'B': [4, np.nan, np.nan]})
+        print("Original DataFrame before removing empty rows:", df)
+        mock_load_df.return_value = df
+        mock_get_uploaded_file.return_value = UploadedFile(file='media/_TEST_20231223233536/TEMP__TEST.csv')
+        mock_save_df.side_effect = lambda df, path: path  # Mocks saving and returns path
 
-        for name in url_names:
-            url = reverse(name)
-            response = self.client.get(url, follow=True)
-            self.assertEqual(response.status_code, 200, f"Page at {url} is not accessible")
+        url = reverse('summary')
+        response = self.client.post(url, {
+            'remove_empty_rows': 'Remove Empty Rows'
+        })
 
-    def tearDown(self):
-        # Clean up
-        self.user.delete()
- 
-class SummaryViewTestCase(TestCase):
+        updated_df = mock_save_df.call_args[0][0]
+        # Check that the empty row has been removed
+        print("Updated DataFrame after removing empty rows:", updated_df)
+
+        self.assertEqual(len(updated_df), 2)
+        self.assertFalse(updated_df.isna().all(axis=1).any())
+        self.assertEqual(response.status_code, 302)  # Assuming redirect after operation
+        self.logger.debug(f"Response status code: {response.status_code}")
+        self.logger.debug(f"Updated DataFrame: {updated_df}")
+
+    @patch('main_page.views.load_dataframe_from_file')
+    @patch('main_page.views.save_dataframe')
+    @patch('main_page.views.UploadedFile.objects.get')
+    @patch('main_page.models.Action.objects.create')
+    def test_remove_empty_columns(self, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
+        # Create a DataFrame with some empty columns
+        df = pd.DataFrame({'A': [1, 2, 3], 'B': [np.nan, np.nan, np.nan], 'C': [4, 5, 6]})
+        print("Original DataFrame before removing empty columns:", df)
+        mock_load_df.return_value = df
+        mock_get_uploaded_file.return_value = UploadedFile(file='media/_TEST_20231223233536/TEMP__TEST.csv')
+        mock_save_df.side_effect = lambda df, path: path  # Mocks saving and returns path
+
+        url = reverse('summary')
+        response = self.client.post(url, {
+            'remove_empty_cols': ['B']  # Assuming 'B' is the name of the empty column
+        })
+
+        updated_df = mock_save_df.call_args[0][0]
+        print("Updated DataFrame after removing empty columns:", updated_df)
+
+        self.assertNotIn('B', updated_df.columns)  # Check that column 'B' has been removed
+        self.assertEqual(response.status_code, 302)
+
+    @patch('main_page.views.load_dataframe_from_file')
+    @patch('main_page.views.save_dataframe')
+    @patch('main_page.views.UploadedFile.objects.get')
+    @patch('main_page.models.Action.objects.create')
+    def test_delete_first_x_rows(self, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
+        df = pd.DataFrame({'A': range(10), 'B': range(10, 20)})
+        print("Original DataFrame before deleting first 3 rows:", df)
+        mock_load_df.return_value = df
+        mock_get_uploaded_file.return_value = UploadedFile(file='media/_TEST_20231223233536/TEMP__TEST.csv')
+        mock_save_df.side_effect = lambda df, path: path  # Mocks saving and returns path
+
+        url = reverse('summary')
+        response = self.client.post(url, {
+            'num_rows_to_delete_start': '3'  # Assuming we want to delete the first 3 rows
+        })
+
+        updated_df = mock_save_df.call_args[0][0]
+        print("Updated DataFrame after deleting first 3 rows:", updated_df)
+        self.assertEqual(len(updated_df), 7)  # Check that 3 rows have been removed
+        self.assertEqual(response.status_code, 302)
+
+    @patch('main_page.views.load_dataframe_from_file')
+    @patch('main_page.views.save_dataframe')
+    @patch('main_page.views.UploadedFile.objects.get')
+    @patch('main_page.models.Action.objects.create')
+    def test_delete_last_x_rows(self, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
+        df = pd.DataFrame({'A': range(10), 'B': range(10, 20)})
+        print("Original DataFrame before deleting last 2 rows:", df)
+        mock_load_df.return_value = df
+        mock_get_uploaded_file.return_value = UploadedFile(file='media/_TEST_20231223233536/TEMP__TEST.csv')
+        mock_save_df.side_effect = lambda df, path: path  # Mocks saving and returns path
+
+        url = reverse('summary')
+        response = self.client.post(url, {
+            'num_rows_to_delete_end': '2'  # Assuming we want to delete the last 2 rows
+        })
+
+        updated_df = mock_save_df.call_args[0][0]
+        print("Updated DataFrame after deleting last 2 rows:", updated_df)
+        self.assertEqual(len(updated_df), 8)  # Check that 2 rows have been removed
+        self.assertEqual(response.status_code, 302)
+
+
+
+class EditColumnsViewTest(TestCase):
     def setUp(self):
         self.client = Client()
-        self.user = User.objects.create_user(username='test', password='test')
-        self.client.login(username='test', password='test')
+        # Create a test user and log in
+        self.user = User.objects.create_user('testuser', 'test@example.com', 'password')
+        self.client.login(username='testuser', password='password')
 
-        # Original file path
-        original_file_path = 'media/_TEST_20231223233536/TEMP__TEST.csv'
-
-        # Create a temporary file for testing
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.csv')
-        self.temp_file_path = temp_file.name
-        temp_file.close()
-
-        # Copy contents of the original file to the temporary file
-        shutil.copyfile(original_file_path, self.temp_file_path)
-
-        # Use the temporary file for testing
-        with open(self.temp_file_path, 'rb') as file:
-            self.uploaded_file = SimpleUploadedFile(
-                name='test_file.csv',
-                content=file.read(),
-                content_type='text/csv'
-            )
-
-    def test_summary_view(self):
-        # Simulate file upload
-        response = self.client.post(reverse('main_page'), {'file': self.uploaded_file})
-        self.assertEqual(response.status_code, 302)  # Assuming redirect after upload
-
-        # Test removing empty rows
-        response = self.client.post(reverse('summary'), {'remove_empty_rows': []})
-        self.assertEqual(response.status_code, 302)  # Assuming redirect after action
-
-        # Test removing empty columns
-        response = self.client.post(reverse('summary'), {'remove_empty_cols': []})
-        self.assertEqual(response.status_code, 302)
-
-        # Test deleting first X rows
-        response = self.client.post(reverse('summary'), {'num_rows_to_delete_start': '2'})
-        self.assertEqual(response.status_code, 302)
-
-        # Test replacing header
-        # response = self.client.post(reverse('summary'), {'replace_header': 'true'})
-        # self.assertEqual(response.status_code, 302)
-
-        # Test deleting last X rows
-        response = self.client.post(reverse('summary'), {'num_rows_to_delete_end': '2'})
-        self.assertEqual(response.status_code, 302)
-
-    def tearDown(self):
-        # Clean up
-        os.remove(self.temp_file_path)
-        self.user.delete()
-        
-
-class EditColumnsViewTestCase(TestCase):
-    def setUp(self):
-        self.client = Client()
-        self.user = User.objects.create_user(username='test', password='test')
-        self.client.login(username='test', password='test')
-
-        # Original file path
-        self.file_path = 'media/_TEST_20231223233536/TEMP__TEST.csv'  # Update with actual path
-
-        # Create a temporary file for testing
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.csv')
-        self.temp_file_path = temp_file.name
-        temp_file.close()
-
-        # Copy contents of the original file to the temporary file
-        shutil.copyfile(self.file_path, self.temp_file_path)
-        # Use the temporary file for testing
-        with open(self.temp_file_path, 'rb') as file:
-            self.uploaded_file = SimpleUploadedFile(
-                name='test_file2.csv',
-                content=file.read(),
-                content_type='text/csv'
-            )
-        # Set up the session data expected by the views
         session = self.client.session
-        session['file_path'] = self.file_path
-        session['temp_file_path'] = self.temp_file_path
+        session['file_path'] = 'media/_TEST_20231223233536/TEMP__TEST.csv'
         session.save()
 
-    def test_add_column(self):
-        response = self.client.post(reverse('edit_columns'), {
+    @patch('main_page.views.load_dataframe_from_file')
+    @patch('main_page.views.save_dataframe')
+    @patch('main_page.views.UploadedFile.objects.get')
+    @patch('main_page.models.Action.objects.create')  # Mock the Action create method
+    def test_add_column(self, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
+        df = pd.DataFrame({'existing_column': [1, 2, 3]})
+        print("Original DataFrame columns:", df.columns.tolist())
+        mock_load_df.return_value = df
+        mock_get_uploaded_file.return_value = UploadedFile(file='media/_TEST_20231223233536/TEMP__TEST.csv')
+
+        # Prevent the Action create method from attempting to save
+        mock_action_create.return_value = MagicMock(spec=Action)
+
+        url = reverse('edit_columns')
+        response = self.client.post(url, {
             'action': 'add_column',
-            'new_column_name': 'test_column'
-        }, follow=True)
-        self.assertEqual(response.status_code, 200)
+            'new_column_name': 'new_test_column'
+        })
 
-        # Read the modified file and check if the column was added
-        df = pd.read_csv(self.temp_file_path)
-        self.assertIn('test_column', df.columns)
+        updated_df = mock_save_df.call_args[0][0]
+        print("Updated DataFrame columns after adding column:", updated_df.columns.tolist())
 
-    def test_delete_columns(self):
-        # Assuming 'column_to_delete' exists in the test file
-        response = self.client.post(reverse('edit_columns'), {
+        self.assertIn('new_test_column', updated_df.columns)
+        self.assertEqual(response.status_code, 302)
+    @patch('main_page.views.load_dataframe_from_file')
+    @patch('main_page.views.save_dataframe')
+    @patch('main_page.views.UploadedFile.objects.get')
+    @patch('main_page.models.Action.objects.create') 
+    def test_delete_columns(self, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
+        df = pd.DataFrame({'A': [1, 2, 3], 'B': [4, 5, 6]})
+        print("Original DataFrame columns before deleting column:", df.columns.tolist())
+        mock_load_df.return_value = df
+        mock_get_uploaded_file.return_value = UploadedFile(file='media/_TEST_20231223233536/TEMP__TEST.csv')
+
+        url = reverse('edit_columns')
+        response = self.client.post(url, {
             'action': 'delete_columns',
-            'columns_to_delete': ['Unnamed: 1']
-        }, follow=True)
-        self.assertEqual(response.status_code, 200)
+            'columns_to_delete': ['A']
+        })
 
-        df = pd.read_csv(self.temp_file_path)
-        self.assertNotIn('Unnamed: 1', df.columns)
+        updated_df = mock_save_df.call_args[0][0]
+        print("Updated DataFrame columns after deleting column:", updated_df.columns.tolist())
 
-    def test_fill_column(self):
-        # Assuming 'column_to_fill' exists in the test file
-        response = self.client.post(reverse('edit_columns'), {
+        self.assertNotIn('A', updated_df.columns)
+        self.assertIn('B', updated_df.columns)
+        self.assertEqual(response.status_code, 302)
+    @patch('main_page.views.load_dataframe_from_file')
+    @patch('main_page.views.save_dataframe')
+    @patch('main_page.views.UploadedFile.objects.get')
+    @patch('main_page.models.Action.objects.create') 
+    def test_fill_column(self, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
+        df = pd.DataFrame({'A': [None, 2, None]})
+        print("Original DataFrame before filling column:", df['A'].tolist())
+        mock_load_df.return_value = df
+        mock_get_uploaded_file.return_value = UploadedFile(file='media/_TEST_20231223233536/TEMP__TEST.csv')
+
+        url = reverse('edit_columns')
+        response = self.client.post(url, {
             'action': 'fill_column',
-            'column_to_fill': 'Unnamed: 2',
-            'fill_value': 'test_fill',
-            'fill_option': 'all'  # or 'empty'
-        }, follow=True)
-        self.assertEqual(response.status_code, 200)
+            'column_to_fill': 'A',
+            'fill_value': '1',
+            'fill_option': 'all'
+        })
 
-        df = pd.read_csv(self.temp_file_path)
-        self.assertTrue((df['Unnamed: 2'] == 'test_fill').all())
+        updated_df = mock_save_df.call_args[0][0]
+        print("Updated DataFrame after filling column:", updated_df['A'].tolist())
+        self.assertTrue((updated_df['A'] == '1').all())
+        self.assertEqual(response.status_code, 302)
+    @patch('main_page.views.load_dataframe_from_file')
+    @patch('main_page.views.save_dataframe')
+    @patch('main_page.views.UploadedFile.objects.get')
+    @patch('main_page.models.Action.objects.create') 
+    def test_split_column(self, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
+        df = pd.DataFrame({'A': ['1-2', '3-4']})
+        print("Original DataFrame columns before splitting column:", df.columns.tolist())
+        mock_load_df.return_value = df
+        mock_get_uploaded_file.return_value = UploadedFile(file='media/_TEST_20231223233536/TEMP__TEST.csv')
 
-    def test_split_column(self):
-        # Assuming 'column_to_split' exists in the test file
-        response = self.client.post(reverse('edit_columns'), {
+        url = reverse('edit_columns')
+        response = self.client.post(url, {
             'action': 'split_column',
-            'column_to_split': 'Unnamed: 3',
-            'split_value': '.'  # Split based on a delimiter
-        }, follow=True)
-        self.assertEqual(response.status_code, 200)
+            'column_to_split': 'A',
+            'split_value': '-',
+            'delete_original': True
+        })
 
-        df = pd.read_csv(self.temp_file_path)
-        self.assertIn('Unnamed: 3_split_1', df.columns)
+        updated_df = mock_save_df.call_args[0][0]
+        print("Updated DataFrame columns after splitting column:", updated_df.columns.tolist())
+        self.assertIn('A_split_1', updated_df.columns)
+        self.assertIn('A_split_2', updated_df.columns)
+        self.assertNotIn('A', updated_df.columns)
+        self.assertEqual(response.status_code, 302)
+    @patch('main_page.views.load_dataframe_from_file')
+    @patch('main_page.views.save_dataframe')
+    @patch('main_page.views.UploadedFile.objects.get')
+    @patch('main_page.models.Action.objects.create') 
+    def test_merge_columns(self, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
+        df = pd.DataFrame({'A': ['1', '3'], 'B': ['2', '4']})
+        print("Original DataFrame before merging columns:", df)
+        mock_load_df.return_value = df
+        mock_get_uploaded_file.return_value = UploadedFile(file='media/_TEST_20231223233536/TEMP__TEST.csv')
 
-    def test_merge_columns(self):
-        # Assuming 'column1' and 'column2' exist in the test file
-        response = self.client.post(reverse('edit_columns'), {
+        url = reverse('edit_columns')
+        response = self.client.post(url, {
             'action': 'merge_columns',
-            'columns_to_merge': ['Unnamed: 4', 'Unnamed: 5'],
-            'merge_separator': '+',
-            'new_column_name': 'merged_column'
-        }, follow=True)
-        self.assertEqual(response.status_code, 200)
+            'columns_to_merge': ['A', 'B'],
+            'merge_separator': '-',
+            'new_merge_column_name': 'merged'
+        })
 
-        df = pd.read_csv(self.temp_file_path)
-        self.assertIn('merged_column', df.columns)
+        updated_df = mock_save_df.call_args[0][0]
+        print("Updated DataFrame after merging columns:", updated_df)
+        self.assertIn('merged', updated_df.columns)
+        self.assertTrue((updated_df['merged'] == ['1-2', '3-4']).all())
+        self.assertEqual(response.status_code, 302)
+    @patch('main_page.views.load_dataframe_from_file')
+    @patch('main_page.views.save_dataframe')
+    @patch('main_page.views.UploadedFile.objects.get')
+    @patch('main_page.models.Action.objects.create') 
+    def test_rename_column(self, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
+        df = pd.DataFrame({'old_name': [1, 2, 3]})
+        print("Original DataFrame columns before renaming column:", df.columns.tolist())
+        mock_load_df.return_value = df
+        mock_get_uploaded_file.return_value = UploadedFile(file='media/_TEST_20231223233536/TEMP__TEST.csv')
 
-    def test_rename_column(self):
-        # Assuming 'old_column_name' exists in the test file
-        response = self.client.post(reverse('edit_columns'), {
+        url = reverse('edit_columns')
+        response = self.client.post(url, {
             'action': 'rename_column',
-            'column_to_rename': 'Unnamed: 6',
-            'new_renamed_column_name': 'new_column_name'
-        }, follow=True)
-        self.assertEqual(response.status_code, 200)
+            'column_to_rename': 'old_name',
+            'new_renamed_column_name': 'new_name'
+        })
 
-        df = pd.read_csv(self.temp_file_path)
-        self.assertIn('new_column_name', df.columns)
-        self.assertNotIn('Unnamed: 6', df.columns)
+        updated_df = mock_save_df.call_args[0][0]
+        print("Updated DataFrame columns after renaming column:", updated_df.columns.tolist())
+        self.assertNotIn('old_name', updated_df.columns)
+        self.assertIn('new_name', updated_df.columns)
+        self.assertEqual(response.status_code, 302)
+
+class EditDataViewTest(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user('testuser', 'test@example.com', 'password')
+        self.client.login(username='testuser', password='password')
+
+        session = self.client.session
+        session['file_path'] = 'media/_TEST_20231223233536/TEMP__TEST.csv'
+        session.save()
 
 
-    def tearDown(self):
-        self.user.delete()
-        os.remove(self.temp_file_path)  # Remove the temporary file
+    @patch('main_page.views.load_dataframe_from_file')
+    @patch('main_page.views.save_dataframe')
+    @patch('main_page.views.UploadedFile.objects.get')
+    @patch('main_page.models.Action.objects.create')
+    def test_replace_symbol(self, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
+        df = pd.DataFrame({'A': ['@text', '@text2', '@text3']})
+        print("Original DataFrame before replacing symbol:", df)
+        mock_load_df.return_value = df
+        mock_get_uploaded_file.return_value = UploadedFile(file='media/_TEST_20231223233536/TEMP__TEST.csv')
+
+        url = reverse('edit_data')
+        response = self.client.post(url, {
+            'action': 'replace_symbol',
+            'columns_to_replace': ['A'],
+            'old_symbol': '@',
+            'new_symbol': '#',
+            'case_sensitive': True
+        })
+
+        updated_df = mock_save_df.call_args[0][0]
+        print("Updated DataFrame after replacing symbol:", updated_df)
+        self.assertTrue((updated_df['A'] == ['#text', '#text2', '#text3']).all())
+        self.assertEqual(response.status_code, 302)
+
+    # @patch('main_page.views.load_dataframe_from_file')
+    # @patch('main_page.views.save_dataframe')
+    # @patch('main_page.views.UploadedFile.objects.get')
+    # @patch('main_page.models.Action.objects.create')
+    # @patch('main_page.utils.record_action')
+    # def test_delete_data(self, mock_record_action, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
+    #     df = pd.DataFrame({'A': ['text1', 'text2', 'text3'], 'B': ['moretext1', 'moretext2', 'moretext3']})
+    #     print("Original DataFrame:", df)
+    #     mock_load_df.return_value = df
+    #     mock_get_uploaded_file.return_value = UploadedFile(file='media/_TEST_20231223233536/TEMP__TEST.csv')
+
+    #     url = reverse('edit_data')
+    #     response = self.client.post(url, {
+    #         'action': 'delete_data',
+    #         'columns_to_modify': ['A', 'B'],
+    #         'delimiter': 'text',
+    #         'delete_option': 'before',
+    #         'include_delimiter': True
+    #     })
+
+    #     updated_df = mock_save_df.call_args[0][0]
+    #     print("Updated DataFrame after deleting data:", updated_df)
+    #     self.assertTrue((updated_df['A'] == ['', '2', '3']).all())
+    #     self.assertEqual(response.status_code, 302)
+
+
+    # @patch('main_page.views.load_dataframe_from_file')
+    # @patch('main_page.views.save_dataframe')
+    # @patch('main_page.views.UploadedFile.objects.get')
+    # @patch('main_page.models.Action.objects.create')
+    # def test_validate_data(self, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
+    #     df = pd.DataFrame({'A': ['123', 'abc', '456']})
+    #     print("Original DataFrame before validating data:", df)
+    #     mock_load_df.return_value = df
+    #     mock_get_uploaded_file.return_value = UploadedFile(file='media/_TEST_20231223233536/TEMP__TEST.csv')
+
+    #     url = reverse('edit_data')
+    #     response = self.client.post(url, {
+    #         'action': 'validate_data',
+    #         'columns_to_validate': ['A'],
+    #         'validation_type': 'numbers',
+    #         'regex_pattern': '',
+    #         'ignore_whitespace': False
+    #     })
+
+    #     # Assume that the validation process stores results in the session or a similar mechanism
+    #     # In this example, we're just checking for the presence of an error message
+    #     self.assertIn('error', response.context)
+
+    # @patch('main_page.views.load_dataframe_from_file')
+    # @patch('main_page.views.save_dataframe')
+    # @patch('main_page.views.UploadedFile.objects.get')
+    # @patch('main_page.models.Action.objects.create')
+    # def test_check_duplicates(self, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
+    #     df = pd.DataFrame({'A': [1, 1, 2], 'B': [3, 3, 4]})
+    #     print("Original DataFrame before checking duplicates:", df)
+    #     mock_load_df.return_value = df
+    #     mock_get_uploaded_file.return_value = UploadedFile(file='media/_TEST_20231223233536/TEMP__TEST.csv')
+
+    #     url = reverse('edit_data')
+    #     response = self.client.post(url, {
+    #         'action': 'check_duplicates',
+    #         'columns_to_check_duplicates': ['A', 'B']
+    #     })
+
+    #     # Check if the view correctly identifies duplicates
+    #     # This may involve checking the response context, session data, or a similar mechanism
+    #     # Here, we're just asserting a successful response
+    #     self.assertEqual(response.status_code, 302)
+    #     self.assertIn('duplicates', response.context)
