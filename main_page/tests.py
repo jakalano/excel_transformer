@@ -183,7 +183,7 @@ class EditColumnsViewTest(TestCase):
     @patch('main_page.models.Action.objects.create') 
     def test_fill_column(self, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
         df = pd.DataFrame({'A': [None, 2, None]})
-        print("Original DataFrame before filling column:", df['A'].tolist())
+        print("Original DataFrame before filling column:", df)
         mock_load_df.return_value = df
         mock_get_uploaded_file.return_value = UploadedFile(file='media/_TEST_20231223233536/TEMP__TEST.csv')
 
@@ -196,7 +196,7 @@ class EditColumnsViewTest(TestCase):
         })
 
         updated_df = mock_save_df.call_args[0][0]
-        print("Updated DataFrame after filling column:", updated_df['A'].tolist())
+        print("Updated DataFrame after filling column:", updated_df)
         self.assertTrue((updated_df['A'] == '1').all())
         self.assertEqual(response.status_code, 302)
     @patch('main_page.views.load_dataframe_from_file')
@@ -304,30 +304,37 @@ class EditDataViewTest(TestCase):
         self.assertTrue((updated_df['A'] == ['#text', '#text2', '#text3']).all())
         self.assertEqual(response.status_code, 302)
 
-    # @patch('main_page.views.load_dataframe_from_file')
-    # @patch('main_page.views.save_dataframe')
-    # @patch('main_page.views.UploadedFile.objects.get')
-    # @patch('main_page.models.Action.objects.create')
-    # @patch('main_page.utils.record_action')
-    # def test_delete_data(self, mock_record_action, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
-    #     df = pd.DataFrame({'A': ['text1', 'text2', 'text3'], 'B': ['moretext1', 'moretext2', 'moretext3']})
-    #     print("Original DataFrame:", df)
-    #     mock_load_df.return_value = df
-    #     mock_get_uploaded_file.return_value = UploadedFile(file='media/_TEST_20231223233536/TEMP__TEST.csv')
+    @patch('main_page.views.load_dataframe_from_file')
+    @patch('main_page.views.save_dataframe')
+    @patch('main_page.views.UploadedFile.objects.get')
+    @patch('main_page.models.Action.objects.create')
+    def test_delete_data(self, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
+        # Setup DataFrame
+        df = pd.DataFrame({'A': ['text1', 'text2', 'text3'], 'B': ['moretext1', 'moretext2', 'moretext3']})
+        print("Original DataFrame:", df)
+        mock_load_df.return_value = df
+        mock_get_uploaded_file.return_value = UploadedFile(file='media/_TEST_20231223233536/TEMP__TEST.csv')
 
-    #     url = reverse('edit_data')
-    #     response = self.client.post(url, {
-    #         'action': 'delete_data',
-    #         'columns_to_modify': ['A', 'B'],
-    #         'delimiter': 'text',
-    #         'delete_option': 'before',
-    #         'include_delimiter': True
-    #     })
+        # Mock Action.objects.create to return an Action with a valid id
+        action_mock = MagicMock(spec=Action)
+        action_mock.id = 123  # Assign a valid id
+        mock_action_create.return_value = action_mock
 
-    #     updated_df = mock_save_df.call_args[0][0]
-    #     print("Updated DataFrame after deleting data:", updated_df)
-    #     self.assertTrue((updated_df['A'] == ['', '2', '3']).all())
-    #     self.assertEqual(response.status_code, 302)
+        # Prepare the POST request
+        url = reverse('edit_data')
+        response = self.client.post(url, {
+            'action': 'delete_data',
+            'columns_to_modify': ['A', 'B'],
+            'delimiter': 'text',
+            'delete_option': 'before',
+            'include_delimiter': True
+        })
+
+        # Check DataFrame and response
+        updated_df = mock_save_df.call_args[0][0]
+        print("Updated DataFrame after deleting data:", updated_df)
+        self.assertTrue((updated_df['A'] == ['1', '2', '3']).all())
+        self.assertEqual(response.status_code, 302)
 
 
     # @patch('main_page.views.load_dataframe_from_file')
