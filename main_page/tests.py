@@ -31,7 +31,7 @@ class SummaryViewTest(TestCase):
     @patch('main_page.models.Action.objects.create')
     def test_remove_empty_rows(self, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
         self.logger.info("Testing removal of empty rows")
-        # Create a DataFrame with some empty rows
+        # Create a df with some empty rows
         df = pd.DataFrame({'A': [1, np.nan, 3], 'B': [4, np.nan, np.nan]})
         print("Original DataFrame before removing empty rows:", df)
         mock_load_df.return_value = df
@@ -58,7 +58,7 @@ class SummaryViewTest(TestCase):
     @patch('main_page.views.UploadedFile.objects.get')
     @patch('main_page.models.Action.objects.create')
     def test_remove_empty_columns(self, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
-        # Create a DataFrame with some empty columns
+        # Create a df with some empty columns
         df = pd.DataFrame({'A': [1, 2, 3], 'B': [np.nan, np.nan, np.nan], 'C': [4, 5, 6]})
         print("Original DataFrame before removing empty columns:", df)
         mock_load_df.return_value = df
@@ -309,7 +309,7 @@ class EditDataViewTest(TestCase):
     @patch('main_page.views.UploadedFile.objects.get')
     @patch('main_page.models.Action.objects.create')
     def test_delete_data(self, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
-        # Setup DataFrame
+        # Setup df
         df = pd.DataFrame({'A': ['text1', 'text2', 'text3'], 'B': ['moretext1', 'moretext2', 'moretext3']})
         print("Original DataFrame:", df)
         mock_load_df.return_value = df
@@ -330,7 +330,7 @@ class EditDataViewTest(TestCase):
             'include_delimiter': True
         })
 
-        # Check DataFrame and response
+        # Check df and response
         updated_df = mock_save_df.call_args[0][0]
         print("Updated DataFrame after deleting data:", updated_df)
         self.assertTrue((updated_df['A'] == ['1', '2', '3']).all())
