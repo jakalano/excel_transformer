@@ -318,9 +318,11 @@ def summary(request):
     print(relative_path)
     # Retrieve templates for the current user
     user_templates = Template.objects.filter(user=request.user)
-    # Initialize variables
-    header_mismatch = False
-    mismatched_headers = ([], [])
+    # Retrieve from session
+    header_mismatch = request.session.get('header_mismatch', False)
+    mismatched_headers = request.session.get('mismatched_headers', ([], []))
+    mismatched_headers_marked = ([], [])
+
     template_application_success = False
 
     try:
@@ -427,10 +429,19 @@ def summary(request):
                 if set(current_headers) != set(template.original_headers):
                     header_mismatch = True
                     print("header mismatch")
-                    messages.error(request, "Headers of the current file do not match the template's original headers.")
+                    print(f"{header_mismatch}")
+                    
                     mismatched_headers = (current_headers, template.original_headers)
+                    print(f"{mismatched_headers}")
+
+   
+                    # Store in session
+                    request.session['header_mismatch'] = header_mismatch
+                    request.session['mismatched_headers'] = mismatched_headers
+                    
                 else:
                     print("headers match")
+                    mismatched_headers_marked = ([], [])
                     for action in template.actions:
                         action_type = action['action_type']
                         parameters = action['parameters']
@@ -443,13 +454,52 @@ def summary(request):
             except Template.DoesNotExist:
                 messages.error(request, "Template not found or access denied.")
 
+        # Adjust columns logic
+        if 'adjust_columns' in request.POST:
+            new_columns = request.POST.getlist('new_column[]')
+            columns_to_delete = request.POST.getlist('delete_columns[]')
+            
+            # Adding new columns
+            for col in new_columns:
+                if col:  # Add column if name is provided
+                    df_v1[col] = None
 
+            # Removing selected columns
+            df_v1.drop(columns=columns_to_delete, errors='ignore', inplace=True)
+            
+            save_dataframe(df_v1, temp_file_path)
+            messages.success(request, "Columns adjusted successfully.")
+
+        # Map headers logic
+        if 'map_headers' in request.POST:
+            for header in df_v1.columns:
+                new_header = request.POST.get(f'header-{header}')
+                if new_header:
+                    df_v1.rename(columns={header: new_header}, inplace=True)
+
+            save_dataframe(df_v1, temp_file_path)
+            messages.success(request, "Headers mapped successfully.")
         
         temp_file_path = save_dataframe(df_v1, temp_file_path)
         # updates the session with the new file path
         request.session['temp_file_path'] = temp_file_path
         # redirects to avoid resubmit on refresh
         return redirect('summary')
+    
+        # Clear the session values if they are not needed anymore
+    if header_mismatch:
+        # Code to process header mismatch...
+        current_mismatched = set(mismatched_headers[0])
+        template_mismatched = set(mismatched_headers[1])
+        diff_headers = current_mismatched.symmetric_difference(template_mismatched)
+
+        current_headers_marked = [(header, header in diff_headers) for header in mismatched_headers[0]]
+        template_headers_marked = [(header, header in diff_headers) for header in mismatched_headers[1]]
+
+        mismatched_headers_marked = (current_headers_marked, template_headers_marked)
+        # Clear the session values
+        del request.session['header_mismatch']
+        del request.session['mismatched_headers']
 
     context = {
         'num_rows': df_v1.shape[0],
@@ -460,6 +510,7 @@ def summary(request):
         'empty_cols': empty_cols,
         'header_mismatch': header_mismatch,
         'mismatched_headers': mismatched_headers,
+        'mismatched_headers_marked': mismatched_headers_marked,
         'template_application_success': template_application_success,
         'table': dataframe_to_html(df_v1, classes='table table-striped'),
         'original_file_name': os.path.basename(file_path),
@@ -893,3 +944,41 @@ def register(request):
     else:
         form = UserCreationForm()
     return render(request, 'register.html', {'form': form})
+
+@login_required(login_url="/login/")
+def adjust_columns(request):
+    temp_file_path = request.session.get('temp_file_path')
+    if request.method == 'POST':
+        df = load_dataframe_from_file(temp_file_path)
+
+        # Adding new columns
+        new_columns = request.POST.getlist('new_column[]')
+        for col in new_columns:
+            if col:  # Add column if name is provided
+                df[col] = None
+
+        # Removing selected columns
+        columns_to_delete = request.POST.getlist('delete_columns[]')
+        df.drop(columns=columns_to_delete, errors='ignore', inplace=True)
+
+        save_dataframe(df, temp_file_path)
+
+    return redirect('summary')
+
+
+@login_required(login_url="/login/")
+def map_headers(request):
+    temp_file_path = request.session.get('temp_file_path')
+    if request.method == 'POST':
+        df = load_dataframe_from_file(temp_file_path)
+
+        # Mapping headers based on user input
+        for header in df.columns:
+            new_header = request.POST.get(f'header-{header}')
+            if new_header:
+                df.rename(columns={header: new_header}, inplace=True)
+
+        save_dataframe(df, temp_file_path)
+
+    return redirect('summary')
+

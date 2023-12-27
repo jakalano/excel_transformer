@@ -88,7 +88,7 @@
                 var csrfToken = '{{ csrf_token }}';
                 var sessionKey = '{{ request.session.session_key }}';
             </script>
-            <script src="{% static 'js/main.js' %}" type="text/javascript"></script>
+            
 
             <button id="undo-button" class="btn btn-warning">Undo</button>
 
@@ -109,25 +109,93 @@
         <br><br>
         {% if header_mismatch %}
         <div>
-            <h4>Header Mismatch Detected</h4>
-            <p>Current Headers: {{ mismatched_headers.0 }}</p>
-            <p>Template Headers: {{ mismatched_headers.1 }}</p>
+            <h4 class="alert alert-danger">Header Mismatch Detected</h4>
+            <p><strong>Current Headers:</strong> 
+                {% for header, is_mismatched in mismatched_headers_marked.0 %}
+                    {% if is_mismatched %}<ins>{{ header }}</ins>{% else %}{{ header }}{% endif %}
+                    {% if not forloop.last %}, {% endif %}
+                {% endfor %}
+            </p>
+            <p><strong>Template Headers: </strong>
+                {% for header, is_mismatched in mismatched_headers_marked.1 %}
+                    {% if is_mismatched %}<ins>{{ header }}</ins>{% else %}{{ header }}{% endif %}
+                    {% if not forloop.last %}, {% endif %}
+                {% endfor %}
+            </p>
+        
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title text-center mb-4">Add and Delete Columns</h5>
+                            <form action="{% url 'summary' %}" method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="adjust_columns" value="1">
+            
+                                <div class="row">
+                                    <!-- Dynamic field for adding new columns -->
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Add Column:</label>
+                                        <div id="newColumnsContainer">
+                                            <input type="text" class="form-control mb-2" name="new_column[]" placeholder="New Column Name">
+                                        </div>
+                                        <button type="button" id="addNewColumnBtn" class="btn btn-secondary">Add Another Column</button>
+                                    </div>
+            
+                                    <!-- Multiple select dropdown for deleting columns -->
+                                    <div class="col-md-6 mb-3">
+                                        <label for="deleteColumnsSelect" class="form-label">Select Columns to Delete:</label>
+                                        <select name="delete_columns[]" id="deleteColumnsSelect" multiple class="form-control">
+                                            {% for col in col_names %}
+                                                <option value="{{ col }}">{{ col }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                </div>
+            
+                                <div class="mt-4 text-center">
+                                    <button type="submit" class="btn btn-primary">Update Columns</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <br><br>
+<!-- Form to map headers -->
+<form action="{% url 'summary' %}" method="post" class="mt-4">
+    {% csrf_token %}
 
-            <!-- Form to add/delete columns -->
-            <form action="{% url 'edit_columns' %}" method="post">
-                {% csrf_token %}
-                <!-- Include inputs and logic for adding/removing columns -->
-                <button type="submit">Update Columns</button>
-            </form>
+    <!-- Hidden field to indicate map_headers action -->
+    <input type="hidden" name="map_headers" value="1">
 
-            <!-- Form to map headers -->
-            <form action="{% url 'map_headers' %}" method="post">
-                {% csrf_token %}
-                <!-- Include inputs for mapping headers -->
-                <button type="submit">Map Headers</button>
-            </form>
+    <!-- Dynamically generate inputs for mapping each header -->
+    {% for header in mismatched_headers.0 %}
+        <div class="mb-3 row">
+            <label for="header-{{ forloop.counter }}" class="col-sm-4 col-form-label">
+                Map "{{ header }}" to:
+            </label>
+            <div class="col-sm-8">
+                <select name="header-{{ forloop.counter }}" id="header-{{ forloop.counter }}" class="form-select">
+                    <option disabled selected value> -- select an option -- </option>
+                    {% for template_header in mismatched_headers.1 %}
+                        <option value="{{ template_header }}">{{ template_header }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    {% endfor %}
+
+    <div class="text-center">
+        <button type="submit" class="btn btn-primary">Map Headers</button>
+    </div>
+</form>
+
+        
         </div><br><br>
         {% endif %}
+        
     </div>
 </div>
 <div class="container">

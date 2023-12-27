@@ -57,3 +57,7 @@
   color: rgb(0, 0, 0);
   border-radius: .25rem;
 }
+
+select option:checked, select option:active, select option:focus{
+  background-color: rgb(220, 124, 124) !important;
+}
