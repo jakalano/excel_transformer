@@ -15,6 +15,8 @@ from .forms import UploadFileForm, ParagraphErrorList
 from .models import Action, UploadedFile, Template
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.models import User
+from django.contrib.auth.forms import UserCreationForm
 import re
 import json
 
@@ -86,7 +88,7 @@ def undo_last_action(request):
 
         # Apply the actions
         for action in actions:
-            df, current_view = apply_action(df, action.action_type, action.parameters)
+            df, current_view = apply_action(df, action.action_type, action.parameters, is_undo=True)
             if current_view is None:
                 break
 
@@ -103,7 +105,7 @@ def undo_last_action(request):
         messages.error(request, "An error occurred while undoing the last action.")
         return redirect('summary')
 
-def apply_action(df, action_type, parameters):
+def apply_action(df, action_type, parameters, is_undo=False):
     try:
         print(f"Applying {action_type} with {parameters}")
         current_view = None  # Variable to hold the current view name
@@ -203,9 +205,15 @@ def apply_action(df, action_type, parameters):
 
             elif action_type == 'replace_symbol':
                 columns_to_replace = parameters.get('columns_to_replace')
-                old_symbol = parameters.get('new_symbol')  # Swap old and new symbols
-                new_symbol = parameters.get('old_symbol')  # for undoing
+                if is_undo:
+                    # Swap only when undoing
+                    old_symbol = parameters.get('new_symbol')
+                    new_symbol = parameters.get('old_symbol')
+                else:
+                    old_symbol = parameters.get('old_symbol')
+                    new_symbol = parameters.get('new_symbol')
                 case_sensitive = parameters.get('case_sensitive')
+
                 for column in columns_to_replace:
                     if case_sensitive:
                         df[column] = df[column].str.replace(old_symbol, new_symbol, regex=True)
@@ -256,60 +264,64 @@ def save_template(request):
         return redirect('download')
 
 
-def apply_template(request):
-    if request.method == 'POST':
-        print("post request")
-        template_id = request.POST.get('template_id')
-        temp_file_path = request.session.get('temp_file_path')
-        print(f"applying {template_id} to {temp_file_path}")
+# def apply_template(request):
+#     if request.method == 'POST':
+#         print("post request")
+#         template_id = request.POST.get('template_id')
+#         temp_file_path = request.session.get('temp_file_path')
+#         print(f"applying {template_id} to {temp_file_path}")
 
-        try:
-            template = Template.objects.get(id=template_id, user=request.user)
-            df = load_dataframe_from_file(temp_file_path)
-            df = pd.DataFrame(df) if not isinstance(df, pd.DataFrame) else df
+#         try:
+#             template = Template.objects.get(id=template_id, user=request.user)
+#             df = load_dataframe_from_file(temp_file_path)
+#             df = pd.DataFrame(df) if not isinstance(df, pd.DataFrame) else df
 
-            # Compare headers
-            current_headers = df.columns.tolist()
-            print(f"current headers: {current_headers}, original headers: {template.original_headers}")
-            if set(current_headers) != set(template.original_headers):
-                messages.error(request, "Headers of the current file do not match the template's original headers.")
-                return redirect('summary')
-            else:
-                print("headers match")
+#             # Compare headers
+#             current_headers = df.columns.tolist()
+#             print(f"current headers: {current_headers}, original headers: {template.original_headers}")
+#             if set(current_headers) != set(template.original_headers):
+#                 messages.error(request, "Headers of the current file do not match the template's original headers.")
+#                 return redirect('summary')
+#             else:
+#                 print("headers match")
 
-            # Apply actions
-            for action in template.actions:
-                action_type = action['action_type']
-                parameters = action['parameters']
-                df = apply_action(df, action_type, parameters)
+#             # Apply actions
+#             for action in template.actions:
+#                 action_type = action['action_type']
+#                 parameters = action['parameters']
+#                 df = apply_action(df, action_type, parameters)
 
-            temp_file_path = request.session.get('temp_file_path')
-            save_dataframe(df, temp_file_path)
-            request.session['html_table'] = dataframe_to_html(df, classes='table table-striped')
-            messages.success(request, "Template applied successfully.")
-            return redirect('summary')
+#             temp_file_path = request.session.get('temp_file_path')
+#             save_dataframe(df, temp_file_path)
+#             request.session['html_table'] = dataframe_to_html(df, classes='table table-striped')
+#             messages.success(request, "Template applied successfully.")
+#             return redirect('summary')
 
-        except Template.DoesNotExist:
-            messages.error(request, "Template not found or access denied.")
-            return redirect('summary')
+#         except Template.DoesNotExist:
+#             messages.error(request, "Template not found or access denied.")
+#             return redirect('summary')
 
-        except Exception as e:
-            messages.error(request, str(e))
-            return redirect('summary')
+#         except Exception as e:
+#             messages.error(request, str(e))
+#             return redirect('summary')
 
-    # Redirect if not a POST request
-    return redirect('summary')
+#     # Redirect if not a POST request
+#     return redirect('summary')
 
 def summary(request):
     temp_file_path = request.session.get('temp_file_path')
     file_path = request.session.get('file_path')
     df_v1 = load_dataframe_from_file(temp_file_path)
     print(file_path)
-        # Extract the relative path using MEDIA_ROOT
+    # Extract the relative path using MEDIA_ROOT
     relative_path = os.path.relpath(file_path, settings.MEDIA_ROOT).replace('\\', '/')
     print(relative_path)
     # Retrieve templates for the current user
     user_templates = Template.objects.filter(user=request.user)
+    # Initialize variables
+    header_mismatch = False
+    mismatched_headers = ([], [])
+    template_application_success = False
 
     try:
         uploaded_file_instance = UploadedFile.objects.get(file=relative_path)
@@ -401,6 +413,37 @@ def summary(request):
                     user=request.user,
                     session_id=request.session.session_key,
                     )
+
+        
+        elif 'apply_template' in request.POST:
+            template_id = request.POST.get('template_id')
+            try:
+                template = Template.objects.get(id=template_id, user=request.user)
+                df_v1 = load_dataframe_from_file(temp_file_path)
+
+                current_headers = df_v1.columns.tolist()
+                print(f"current headers: {current_headers}, original headers: {template.original_headers}")
+
+                if set(current_headers) != set(template.original_headers):
+                    header_mismatch = True
+                    print("header mismatch")
+                    messages.error(request, "Headers of the current file do not match the template's original headers.")
+                    mismatched_headers = (current_headers, template.original_headers)
+                else:
+                    print("headers match")
+                    for action in template.actions:
+                        action_type = action['action_type']
+                        parameters = action['parameters']
+                        df_v1 = apply_action(df_v1, action_type, parameters)
+                    
+                    save_dataframe(df_v1, temp_file_path)
+                    template_application_success = True
+                    messages.success(request, "Template applied successfully.")
+
+            except Template.DoesNotExist:
+                messages.error(request, "Template not found or access denied.")
+
+
         
         temp_file_path = save_dataframe(df_v1, temp_file_path)
         # updates the session with the new file path
@@ -415,6 +458,9 @@ def summary(request):
         'num_empty_rows': df_v1[df_v1.isna().all(axis=1)].shape[0],
         'num_empty_cols': df_v1.columns[df_v1.isna().all(axis=0)].size,
         'empty_cols': empty_cols,
+        'header_mismatch': header_mismatch,
+        'mismatched_headers': mismatched_headers,
+        'template_application_success': template_application_success,
         'table': dataframe_to_html(df_v1, classes='table table-striped'),
         'original_file_name': os.path.basename(file_path),
         'templates': user_templates,
@@ -821,4 +867,29 @@ def download(request):
 
 
 
- 
+@login_required(login_url="/login/")
+def user_profile(request):
+    user_templates = Template.objects.filter(user=request.user)  # Retrieves templates for the current user
+
+    context = {
+        'user': request.user,
+        'templates': user_templates,
+        'date_joined': request.user.date_joined,  # User's date of joining
+        'last_login': request.user.last_login,    # User's last login
+        'active_page': 'user_profile',            # For highlighting the active page in the navbar
+    }
+    return render(request, 'user_profile.html', context)
+
+
+
+def register(request):
+    if request.method == 'POST':
+        form = UserCreationForm(request.POST)
+        if form.is_valid():
+            form.save()
+            username = form.cleaned_data.get('username')
+            messages.success(request, f'Account created for {username}! You can now log in.')
+            return redirect('login')
+    else:
+        form = UserCreationForm()
+    return render(request, 'register.html', {'form': form})

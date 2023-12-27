@@ -68,19 +68,26 @@
                 data-bs-toggle="dropdown"
                 aria-expanded="false"
               >
-                Mans konts
+              {{ user.username }}
               </a>
-              <ul class="dropdown-menu">
-                <li><a class="dropdown-item" href="#">Konts</a></li>
-                <li><a class="dropdown-item" href="#">Manas veidnes</a></li>
-                <li><a class="dropdown-item" href="{% url 'logout' %}">Atteikties</a></li>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li><a class="dropdown-item {% if active_page == 'user_profile' %}active{% endif %}" href="{% url 'user_profile' %}">Mans konts</a></li>
+                
+                <li><a class="dropdown-item" href="{% url 'logout' %}">Izrakstīties</a></li>
               </ul>
 
             </span>
               {% else %}
               <span class="nav-item">
-  <a class="nav-link" href="{% url 'login' %}">Login</a></span>
-{% endif %}</span>
+                <div class="nav-item d-flex">
+                  <span class="me-2">
+                      <a class="nav-link {% if active_page == 'login' %}active{% endif %}" href="{% url 'login' %}">Pierakstīties</a>
+                  </span>
+                  <span>
+                      <a class="nav-link {% if active_page == 'register' %}active{% endif %}" href="{% url 'register' %}">Reģistrēties</a>
+                  </span>
+              </div></span>
+                {% endif %}</span>
           
         </div>
       </div>

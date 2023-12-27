@@ -94,7 +94,7 @@
 
         </form>
         <br><br>
-        <form action="{% url 'apply_template' %}" method="post">
+        <form action="{% url 'summary' %}" method="post">
             {% csrf_token %}
             <label for="template_id">Choose a template to apply:</label>
             <select name="template_id" id="template_id">
@@ -104,10 +104,30 @@
                 <option>No templates available</option>
                 {% endfor %}
             </select>
-            <button type="submit">Apply Template</button>
+            <button type="submit" name="apply_template">Apply Template</button>
         </form>
         <br><br>
-        
+        {% if header_mismatch %}
+        <div>
+            <h4>Header Mismatch Detected</h4>
+            <p>Current Headers: {{ mismatched_headers.0 }}</p>
+            <p>Template Headers: {{ mismatched_headers.1 }}</p>
+
+            <!-- Form to add/delete columns -->
+            <form action="{% url 'edit_columns' %}" method="post">
+                {% csrf_token %}
+                <!-- Include inputs and logic for adding/removing columns -->
+                <button type="submit">Update Columns</button>
+            </form>
+
+            <!-- Form to map headers -->
+            <form action="{% url 'map_headers' %}" method="post">
+                {% csrf_token %}
+                <!-- Include inputs for mapping headers -->
+                <button type="submit">Map Headers</button>
+            </form>
+        </div><br><br>
+        {% endif %}
     </div>
 </div>
 <div class="container">
