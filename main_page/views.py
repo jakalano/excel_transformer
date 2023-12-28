@@ -9,7 +9,13 @@ from django.template import loader
 from django.conf import settings
 from .utils import (
     load_dataframe_from_file, save_dataframe,
-    dataframe_to_html, remove_empty_rows,record_action, get_actions_for_session, save_as_template, action_to_dict
+    dataframe_to_html, remove_empty_rows,record_action, 
+    get_actions_for_session, save_as_template, action_to_dict,
+    handle_remove_empty_rows, handle_remove_empty_cols,
+    handle_delete_first_x_rows, handle_delete_last_x_rows,
+    handle_replace_header_with_first_row, add_column,
+    delete_columns, fill_column, split_column,
+    merge_columns, rename_column
 )
 from .forms import UploadFileForm, ParagraphErrorList
 from .models import Action, UploadedFile, Template
@@ -108,6 +114,8 @@ def undo_last_action(request):
 def apply_action(df, action_type, parameters, is_undo=False):
     try:
         print(f"Applying {action_type} with {parameters}")
+        # Print initial state of DataFrame
+        print("DataFrame before action:", df.head())
         current_view = None  # Variable to hold the current view name
 
         # Define view names for each action type
@@ -120,26 +128,23 @@ def apply_action(df, action_type, parameters, is_undo=False):
             current_view = 'summary'
 
             if action_type == 'remove_empty_rows':
-                df = remove_empty_rows(df)
+                df, rows_removed = handle_remove_empty_rows(df)
                 
             elif action_type == 'remove_empty_cols':
                 cols_to_delete = parameters.get('cols_to_delete')
-                df = df.drop(cols_to_delete, axis=1)
+                df, cols_removed = handle_remove_empty_cols(df, cols_to_delete)
+
                 
             elif action_type == 'delete_first_X_rows':
                 num_rows_to_delete_start = int(parameters.get('num_rows_to_delete_start', 0))
-                df = df.iloc[num_rows_to_delete_start:]
+                df = handle_delete_first_x_rows(df, num_rows_to_delete_start)
                 
             elif action_type == 'replace_header':
-                df.columns = df.iloc[0]
-                df = df.iloc[1:]
+                df = handle_replace_header_with_first_row(df)
                 
             elif action_type == 'delete_last_X_rows':
                 num_rows_to_delete_end = int(parameters.get('num_rows_to_delete_end', 0))
-                if num_rows_to_delete_end:
-                    df = df.iloc[:-num_rows_to_delete_end]
-                else:
-                    df, None
+                df = handle_delete_last_x_rows(df, num_rows_to_delete_end)
                 
 
         # action handlers for edit_columns view
@@ -148,33 +153,30 @@ def apply_action(df, action_type, parameters, is_undo=False):
         
             if action_type == 'add_column':
                 new_column_name = parameters.get('new_column_name')
-                df[new_column_name] = None
+                df = add_column(df, new_column_name)
                 
 
             elif action_type == 'delete_columns':
                 columns_to_delete = parameters.get('columns_to_delete')
-                df = df.drop(columns=columns_to_delete, axis=1)
+                df = delete_columns(df, columns_to_delete)
                 
 
             elif action_type == 'fill_column':
                 column_to_fill = parameters.get('column_to_fill')
                 fill_value = parameters.get('fill_value')
                 fill_option = parameters.get('fill_option')
-                if fill_option == 'all':
-                    df[column_to_fill] = fill_value
-                elif fill_option == 'empty':
-                    df[column_to_fill].fillna(fill_value, inplace=True)
+                if column_to_fill and fill_value is not None:
+                    df = fill_column(df, column_to_fill, fill_value, fill_option)
                 
 
             elif action_type == 'split_column':
                 column_to_split = parameters.get('column_to_split')
                 split_value = parameters.get('split_value')
-                split_data = df[column_to_split].str.split(split_value, expand=True)
-                for i, new_column in enumerate(split_data.columns):
-                    new_column_name = f"{column_to_split}_split_{i+1}"
-                    df[new_column_name] = split_data[new_column]
-                if parameters.get('delete_original'):
-                    df.drop(columns=[column_to_split], inplace=True)
+                delete_original = parameters.get('delete_original')
+                if column_to_split in df.columns and split_value:
+                    # performs the split operation
+                    df = split_column(df, column_to_split, split_value, delete_original)
+
                 
 
             elif action_type == 'merge_columns':
@@ -182,26 +184,17 @@ def apply_action(df, action_type, parameters, is_undo=False):
                 merge_separator = parameters.get('merge_separator', '')
                 new_column_name = parameters.get('new_column_name')
 
-                # Dynamic naming for the new merged column if name not provided
-                if not new_column_name:
-                    # Use a counter to create a unique name
-                    existing_columns = [col for col in df.columns if col.startswith('merged_column_')]
-                    new_column_index = len(existing_columns) + 1
-                    new_column_name = f'merged_column_{new_column_index}'
-
-                if columns_to_merge:
-                    # Apply a lambda function to merge columns while skipping NaN values
-                    df[new_column_name] = df.apply(
-                        lambda row: merge_separator.join(
-                            [str(row[col]) for col in columns_to_merge if pd.notna(row[col])]
-                        ),
-                        axis=1
-                    )
+                df = merge_columns(df, columns_to_merge, merge_separator, new_column_name)
 
             elif action_type == 'rename_column':
-                column_to_rename = parameters.get('column_to_rename')
-                new_column_name = parameters.get('new_column_name')
-                df.rename(columns={column_to_rename: new_column_name}, inplace=True)
+                if is_undo:
+                    column_to_rename = parameters.get('new_column_name')
+                    new_column_name = parameters.get('column_to_rename')
+                else:
+                    column_to_rename = parameters.get('column_to_rename')
+                    new_column_name = parameters.get('new_column_name')
+                if column_to_rename in df.columns and new_column_name:
+                    df = rename_column(df, column_to_rename, new_column_name)
                 
 
         # action handlers for edit_data view
@@ -237,6 +230,7 @@ def apply_action(df, action_type, parameters, is_undo=False):
 
         else:
             print(f"Unknown action type: {action_type}")
+        print(f"DataFrame after applying {action_type}:", df.head())
         return df, None
     
     except Exception as e:
@@ -351,10 +345,7 @@ def summary(request):
     if request.method == 'POST':
         # deletes all empty rows
         if 'remove_empty_rows' in request.POST:
-            initial_row_count = df_v1.shape[0]
-            df_v1 = remove_empty_rows(df_v1)
-            final_row_count = df_v1.shape[0]
-            rows_removed = initial_row_count - final_row_count
+            df_v1, rows_removed = handle_remove_empty_rows(df_v1)
 
             messages.success(request, f'{rows_removed} empty rows removed.')
 
@@ -368,11 +359,9 @@ def summary(request):
            
         # deletes selected columns
         elif 'remove_empty_cols' in request.POST:
-            initial_col_count = df_v1.shape[1]
             cols_to_delete = request.POST.getlist('remove_empty_cols')
-            df_v1 = df_v1.drop(columns=cols_to_delete)
-            final_col_count = df_v1.shape[1]
-            cols_removed = initial_col_count - final_col_count
+            df_v1, cols_removed = handle_remove_empty_cols(df_v1, cols_to_delete)
+
 
             messages.success(request, f'{cols_removed} empty columns removed.')
             record_action(        
@@ -393,7 +382,7 @@ def summary(request):
 
         # deletes the first X rows
         if num_rows_to_delete_start > 0:
-            df_v1 = df_v1.iloc[num_rows_to_delete_start:]
+            df_v1 = handle_delete_first_x_rows(df_v1, num_rows_to_delete_start)
             messages.success(request, f'First {num_rows_to_delete_start} deleted successfully.')
             record_action(        
                     uploaded_file=uploaded_file_instance,
@@ -405,8 +394,7 @@ def summary(request):
         
         # if replace_header is True, set the df columns to the first row's values
         if replace_header:
-            df_v1.columns = df_v1.iloc[0]
-            df_v1 = df_v1.iloc[1:]
+            df_v1 = handle_replace_header_with_first_row(df_v1)
             record_action(        
                     uploaded_file=uploaded_file_instance,
                     action_type='replace_header',
@@ -420,7 +408,7 @@ def summary(request):
         
         # deletes the last X rows
         if num_rows_to_delete_end > 0:
-            df_v1 = df_v1.iloc[:-num_rows_to_delete_end]
+            df_v1 = handle_delete_last_x_rows(df_v1, num_rows_to_delete_end)
             messages.success(request, f'Last {num_rows_to_delete_end} deleted successfully.')
             record_action(        
                     uploaded_file=uploaded_file_instance,
@@ -456,6 +444,7 @@ def summary(request):
                 else:
                     print("headers match")
                     mismatched_headers_marked = ([], [])
+                    print("Applying actions from template:", template.actions)  # Check actions
                     for action in template.actions:
                         action_type = action['action_type']
                         parameters = action['parameters']
@@ -463,10 +452,11 @@ def summary(request):
                         if error_message:
                             # If there's an error, display it and revert to the original DataFrame
                             messages.error(request, f"Error applying template: {error_message}")
-                            save_dataframe(df_v1, temp_file_path)  # Save the original DataFrame
+                            save_dataframe(df_original, temp_file_path)  # Save the original DataFrame
                             return redirect('summary')
                     
-                    save_dataframe(df_v1, temp_file_path)
+                    df_v1 = df_original
+                    save_dataframe(df_original, temp_file_path)
                     template_application_success = True
                     messages.success(request, "Template applied successfully.")
 
@@ -563,7 +553,7 @@ def edit_columns(request):
             new_column_name = request.POST.get('new_column_name')
             print(f"New column name: {new_column_name}")  
             if new_column_name:
-                df_v2[new_column_name] = None
+                df_v2 = add_column(df_v2, new_column_name)
             messages.success(request, f'Column "{new_column_name}" added successfully.')
             record_action(
                 uploaded_file=uploaded_file_instance,        
@@ -578,7 +568,7 @@ def edit_columns(request):
             # handles deleting selected columns
         elif action == 'delete_columns':
             columns_to_delete = request.POST.getlist('columns_to_delete')
-            df_v2.drop(columns=columns_to_delete, inplace=True)
+            df_v2 = delete_columns(df_v2, columns_to_delete)
             messages.success(request, f'{len(columns_to_delete)} columns deleted successfully.')
             record_action(
                 uploaded_file=uploaded_file_instance,        
@@ -595,10 +585,7 @@ def edit_columns(request):
             fill_option = request.POST.get('fill_option')
 
             if column_to_fill and fill_value is not None:
-                if fill_option == 'all':
-                    df_v2[column_to_fill] = fill_value
-                elif fill_option == 'empty':
-                    df_v2[column_to_fill].fillna(fill_value, inplace=True)
+                df_v2 = fill_column(df_v2, column_to_fill, fill_value, fill_option)
             messages.success(request, f'Column "{column_to_fill}" filled successfully with "{fill_value}".')
 
             record_action(
@@ -621,14 +608,7 @@ def edit_columns(request):
 
             if column_to_split in df_v2.columns and split_value:
                 # performs the split operation
-                split_data = df_v2[column_to_split].str.split(split_value, expand=True)
-                for i, new_column in enumerate(split_data.columns):
-                    new_column_name = f"{column_to_split}_split_{i+1}"
-                    df_v2[new_column_name] = split_data[new_column]
-
-                # if user opted to delete the original column, drop it
-                if delete_original:
-                    df_v2.drop(columns=[column_to_split], inplace=True)
+                df_v2 = split_column(df_v2, column_to_split, split_value, delete_original)
             messages.success(request, f'Column "{column_to_split}" split successfully.')
             record_action(
                 uploaded_file=uploaded_file_instance,        
@@ -648,20 +628,9 @@ def edit_columns(request):
             merge_separator = request.POST.get('merge_separator', '')
             new_column_name = request.POST.get('new_merge_column_name')
 
-            if not new_column_name:
-                # Use a counter to create a unique name
-                existing_columns = [col for col in df_v2.columns if col.startswith('merged_column_')]
-                new_column_index = len(existing_columns) + 1
-                new_column_name = f'merged_column_{new_column_index}'
 
-            if columns_to_merge:
-                # Apply a lambda function to merge columns while skipping NaN values
-                df_v2[new_column_name] = df_v2.apply(
-                    lambda row: merge_separator.join(
-                        [str(row[col]) for col in columns_to_merge if pd.notna(row[col])]
-                    ),
-                    axis=1
-                )
+
+            df_v2 = merge_columns(df_v2, columns_to_merge, merge_separator, new_column_name)
             messages.success(request, f'Columns merged into "{new_column_name}" successfully.')
             record_action(
                 uploaded_file=uploaded_file_instance,        
@@ -681,8 +650,7 @@ def edit_columns(request):
             new_column_name = request.POST.get('new_renamed_column_name')
 
             if column_to_rename in df_v2.columns and new_column_name:
-                df_v2.rename(columns={column_to_rename: new_column_name}, inplace=True)
-                save_dataframe(df_v2, temp_file_path)
+                df_v2 = rename_column(df_v2, column_to_rename, new_column_name)
             messages.success(request, f'Column "{column_to_rename}" renamed to "{new_column_name}" successfully.')
             record_action(
                 uploaded_file=uploaded_file_instance,        
