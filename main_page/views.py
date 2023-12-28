@@ -473,7 +473,9 @@ def summary(request):
         # Map headers logic
         if 'map_headers' in request.POST:
             for header in df_v1.columns:
+                print(f'old header-{header}')
                 new_header = request.POST.get(f'header-{header}')
+                print(f'new header-{new_header}')
                 if new_header:
                     df_v1.rename(columns={header: new_header}, inplace=True)
 

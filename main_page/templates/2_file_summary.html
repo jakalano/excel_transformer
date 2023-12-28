@@ -172,20 +172,20 @@
 
     <!-- Dynamically generate inputs for mapping each header -->
     {% for header in mismatched_headers.0 %}
-        <div class="mb-3 row">
-            <label for="header-{{ forloop.counter }}" class="col-sm-4 col-form-label">
-                Map "{{ header }}" to:
-            </label>
-            <div class="col-sm-8">
-                <select name="header-{{ forloop.counter }}" id="header-{{ forloop.counter }}" class="form-select">
-                    <option disabled selected value> -- select an option -- </option>
-                    {% for template_header in mismatched_headers.1 %}
-                        <option value="{{ template_header }}">{{ template_header }}</option>
-                    {% endfor %}
-                </select>
-            </div>
+    <div class="mb-3 row">
+        <label for="header-{{ header }}" class="col-sm-4 col-form-label">
+            Map "{{ header }}" to:
+        </label>
+        <div class="col-sm-8">
+            <select name="header-{{ header }}" id="header-{{ header }}" class="form-select">
+                <option disabled selected value> -- select an option -- </option>
+                {% for template_header in mismatched_headers.1 %}
+                    <option value="{{ template_header }}">{{ template_header }}</option>
+                {% endfor %}
+            </select>
         </div>
-    {% endfor %}
+    </div>
+{% endfor %}
 
     <div class="text-center">
         <button type="submit" class="btn btn-primary">Map Headers</button>
