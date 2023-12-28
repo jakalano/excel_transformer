@@ -139,7 +139,7 @@ def apply_action(df, action_type, parameters, is_undo=False):
                 if num_rows_to_delete_end:
                     df = df.iloc[:-num_rows_to_delete_end]
                 else:
-                    df
+                    df, None
                 
 
         # action handlers for edit_columns view
@@ -180,9 +180,23 @@ def apply_action(df, action_type, parameters, is_undo=False):
             elif action_type == 'merge_columns':
                 columns_to_merge = parameters.get('columns_to_merge')
                 merge_separator = parameters.get('merge_separator', '')
-                new_column_name = parameters.get('new_column_name', 'merged_column')
-                df[new_column_name] = df[columns_to_merge].astype(str).apply(merge_separator.join, axis=1)
-                
+                new_column_name = parameters.get('new_column_name')
+
+                # Dynamic naming for the new merged column if name not provided
+                if not new_column_name:
+                    # Use a counter to create a unique name
+                    existing_columns = [col for col in df.columns if col.startswith('merged_column_')]
+                    new_column_index = len(existing_columns) + 1
+                    new_column_name = f'merged_column_{new_column_index}'
+
+                if columns_to_merge:
+                    # Apply a lambda function to merge columns while skipping NaN values
+                    df[new_column_name] = df.apply(
+                        lambda row: merge_separator.join(
+                            [str(row[col]) for col in columns_to_merge if pd.notna(row[col])]
+                        ),
+                        axis=1
+                    )
 
             elif action_type == 'rename_column':
                 column_to_rename = parameters.get('column_to_rename')
@@ -223,11 +237,11 @@ def apply_action(df, action_type, parameters, is_undo=False):
 
         else:
             print(f"Unknown action type: {action_type}")
-        return df
+        return df, None
     
     except Exception as e:
         print(f"Error applying action {action_type} with parameters {parameters}: {str(e)}")
-        return df
+        return df, str(e)  # Return the DataFrame and the error message
 
 @login_required(login_url="/login/")
 def save_template(request):
@@ -421,9 +435,9 @@ def summary(request):
             template_id = request.POST.get('template_id')
             try:
                 template = Template.objects.get(id=template_id, user=request.user)
-                df_v1 = load_dataframe_from_file(temp_file_path)
+                df_original = load_dataframe_from_file(temp_file_path)
 
-                current_headers = df_v1.columns.tolist()
+                current_headers = df_original.columns.tolist()
                 print(f"current headers: {current_headers}, original headers: {template.original_headers}")
 
                 if set(current_headers) != set(template.original_headers):
@@ -445,7 +459,12 @@ def summary(request):
                     for action in template.actions:
                         action_type = action['action_type']
                         parameters = action['parameters']
-                        df_v1 = apply_action(df_v1, action_type, parameters)
+                        df_original, error_message = apply_action(df_original, action_type, parameters)
+                        if error_message:
+                            # If there's an error, display it and revert to the original DataFrame
+                            messages.error(request, f"Error applying template: {error_message}")
+                            save_dataframe(df_v1, temp_file_path)  # Save the original DataFrame
+                            return redirect('summary')
                     
                     save_dataframe(df_v1, temp_file_path)
                     template_application_success = True
@@ -630,11 +649,19 @@ def edit_columns(request):
             new_column_name = request.POST.get('new_merge_column_name')
 
             if not new_column_name:
-                new_column_name = 'merged_column'
+                # Use a counter to create a unique name
+                existing_columns = [col for col in df_v2.columns if col.startswith('merged_column_')]
+                new_column_index = len(existing_columns) + 1
+                new_column_name = f'merged_column_{new_column_index}'
 
             if columns_to_merge:
-                # performs the merge operation
-                df_v2[new_column_name] = df_v2[columns_to_merge].astype(str).apply(merge_separator.join, axis=1)
+                # Apply a lambda function to merge columns while skipping NaN values
+                df_v2[new_column_name] = df_v2.apply(
+                    lambda row: merge_separator.join(
+                        [str(row[col]) for col in columns_to_merge if pd.notna(row[col])]
+                    ),
+                    axis=1
+                )
             messages.success(request, f'Columns merged into "{new_column_name}" successfully.')
             record_action(
                 uploaded_file=uploaded_file_instance,        
