@@ -1,77 +1,145 @@
 console.log("main.js loaded");
 document.addEventListener("DOMContentLoaded", function () {
-function handleSummaryPageActions() {
-  // check if you're on the summary pages
-  if (window.location.pathname === "/summary/") {
-    //
-    console.log("Summary page");
-    let nextPageLink = document.querySelector('.page-link[href="/edit_data/"]');
-    let removeRowsCheckbox = document.getElementById("removeRowsCheckbox");
-    let removeColsCheckbox = document.getElementById("removeColsCheckbox");
-    let removeEmptyRowsForm = document.getElementById("removeEmptyRowsForm");
-    if (removeRowsCheckbox || removeColsCheckbox) {
-      console.log("checkbox");
-      if (nextPageLink) {
-        console.log("Next page link found", nextPageLink);
-        nextPageLink.addEventListener("click", function (event) {
-          console.log("Next page link clicked");
-          if (removeRowsCheckbox.checked || removeColsCheckbox.checked) {
-            event.preventDefault();
-            console.log("Checkbox is checked, submitting form");
-            removeEmptyRowsForm.submit();
-          }
+
+    function handleDeleteFile() {
+        let deleteFileBtn = document.getElementById('deleteFileBtn');
+        if (deleteFileBtn) {
+            deleteFileBtn.addEventListener('click', function() {
+                if (confirm('Are you sure you want to delete this file?')) {
+                    let deleteUrl = deleteFileBtn.getAttribute('data-url');
+                    let csrfToken = deleteFileBtn.getAttribute('data-csrf');
+
+                    fetch(deleteUrl, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': csrfToken,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ 'delete': true })
+                    }).then(function(response) {
+                        if (response.ok) {
+                            window.location.href = '/';
+                        } else {
+                            alert('Error: Unable to delete the file.');
+                        }
+                    });
+                }
+            });
+        }
+    }
+
+    handleDeleteFile();
+
+
+    function handleDeleteTemplate() {
+        let deleteTemplateBtns = document.querySelectorAll('.deleteTemplateBtn');
+        deleteTemplateBtns.forEach(button => {
+            button.addEventListener('click', function() {
+                if (confirm('Are you sure you want to delete this template?')) {
+                    let deleteUrl = button.getAttribute('data-url');
+                    let csrfToken = button.getAttribute('data-csrf');
+
+                    fetch(deleteUrl, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': csrfToken,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ 'delete': true })
+                    }).then(function(response) {
+                        if (response.ok) {
+                            // Optionally, remove the template from the UI or refresh the page
+                            button.closest('.accordion-item').remove();
+                        } else {
+                            alert('Error: Unable to delete the template.');
+                        }
+                    });
+                }
+            });
         });
-      } else {
-        console.log("Next page link NOT found");
+    }
+
+    handleDeleteTemplate();
+
+    
+  function handleSummaryPageActions() {
+    // check if you're on the summary pages
+    if (window.location.pathname === "/summary/") {
+      //
+      console.log("Summary page");
+      let nextPageLink = document.querySelector(
+        '.page-link[href="/edit_data/"]'
+      );
+      let removeRowsCheckbox = document.getElementById("removeRowsCheckbox");
+      let removeColsCheckbox = document.getElementById("removeColsCheckbox");
+      let removeEmptyRowsForm = document.getElementById("removeEmptyRowsForm");
+      if (removeRowsCheckbox || removeColsCheckbox) {
+        console.log("checkbox");
+        if (nextPageLink) {
+          console.log("Next page link found", nextPageLink);
+          nextPageLink.addEventListener("click", function (event) {
+            console.log("Next page link clicked");
+            if (removeRowsCheckbox.checked || removeColsCheckbox.checked) {
+              event.preventDefault();
+              console.log("Checkbox is checked, submitting form");
+              removeEmptyRowsForm.submit();
+            }
+          });
+        } else {
+          console.log("Next page link NOT found");
+        }
+      }
+      let addNewColumnBtn = document.getElementById("addNewColumnBtn");
+      if (addNewColumnBtn) {
+        addNewColumnBtn.addEventListener("click", function (event) {
+          event.preventDefault(); // Prevent default button behavior
+
+          let newInputDiv = document.createElement("div");
+          newInputDiv.classList.add("mb-2");
+
+          let newInput = document.createElement("input");
+          newInput.type = "text";
+          newInput.name = "new_column[]";
+          newInput.placeholder = "New Column Name";
+          newInput.classList.add("form-control"); // Apply Bootstrap styling
+
+          newInputDiv.appendChild(newInput);
+          document
+            .getElementById("newColumnsContainer")
+            .appendChild(newInputDiv);
+        });
       }
     }
-    let addNewColumnBtn = document.getElementById("addNewColumnBtn");
-    if (addNewColumnBtn) {
-        addNewColumnBtn.addEventListener("click", function (event) {
-            event.preventDefault(); // Prevent default button behavior
-
-            let newInputDiv = document.createElement("div");
-            newInputDiv.classList.add("mb-2");
-
-            let newInput = document.createElement("input");
-            newInput.type = "text";
-            newInput.name = "new_column[]";
-            newInput.placeholder = "New Column Name";
-            newInput.classList.add("form-control"); // Apply Bootstrap styling
-
-            newInputDiv.appendChild(newInput);
-            document.getElementById("newColumnsContainer").appendChild(newInputDiv);
-        });
-    }
   }
-}handleSummaryPageActions();
+    handleSummaryPageActions();
+    
+  
 
-// document.addEventListener('DOMContentLoaded', function() {
-//     let undoButton = document.getElementById('undo-button');
-//     if (undoButton) {
-//         undoButton.addEventListener('click', function() {
-//             console.log("Undo button clicked!");
-//     // Send AJAX request to undo view
-//     fetch('/undo/', {
-//         method: 'POST',
-//         headers: {
-//             'Content-Type': 'application/json',
-//             'X-CSRFToken': csrfToken,  // Pass CSRF token
-//         },
-//         body: JSON.stringify({
-//             'session_key': sessionKey,
-//         })
-//     })
-//     .then(response => response.json())
-//     .then(data => {
-//         // Update UI accordingly
-//     })
-// });
-// } else {
-//     console.error('Undo button not found!');
-// }
-// });
-
+  // document.addEventListener('DOMContentLoaded', function() {
+  //     let undoButton = document.getElementById('undo-button');
+  //     if (undoButton) {
+  //         undoButton.addEventListener('click', function() {
+  //             console.log("Undo button clicked!");
+  //     // Send AJAX request to undo view
+  //     fetch('/undo/', {
+  //         method: 'POST',
+  //         headers: {
+  //             'Content-Type': 'application/json',
+  //             'X-CSRFToken': csrfToken,  // Pass CSRF token
+  //         },
+  //         body: JSON.stringify({
+  //             'session_key': sessionKey,
+  //         })
+  //     })
+  //     .then(response => response.json())
+  //     .then(data => {
+  //         // Update UI accordingly
+  //     })
+  // });
+  // } else {
+  //     console.error('Undo button not found!');
+  // }
+  // });
 
   ///////////// undo functionality /////////////
   let undoButton = document.getElementById("undo-button");
@@ -168,25 +236,25 @@ function handleSummaryPageActions() {
 
   ///////////// regex text field appears only when regex selected in edit_data /////////////
 
-    var validationTypeSelect = document.getElementById("validation_type");
-    if (validationTypeSelect) {
-        var regexInput = document.getElementById("regex_pattern");
+  var validationTypeSelect = document.getElementById("validation_type");
+  if (validationTypeSelect) {
+    var regexInput = document.getElementById("regex_pattern");
 
-        // function to show/hide regex input
-        function toggleRegexInput() {
-            if (validationTypeSelect.value === "regex") {
-                regexInput.style.display = "block";
-            } else {
-                regexInput.style.display = "none";
-            }
-        }
-
-        // event listener for change on validation type dropdown
-        validationTypeSelect.addEventListener("change", toggleRegexInput);
-
-        // initial check in case of page reload
-        toggleRegexInput();
+    // function to show/hide regex input
+    function toggleRegexInput() {
+      if (validationTypeSelect.value === "regex") {
+        regexInput.style.display = "block";
+      } else {
+        regexInput.style.display = "none";
+      }
     }
+
+    // event listener for change on validation type dropdown
+    validationTypeSelect.addEventListener("change", toggleRegexInput);
+
+    // initial check in case of page reload
+    toggleRegexInput();
+  }
   /////////////// JavaScript for handling duplicates ///////////
 
   function renderDuplicates(duplicates) {
@@ -260,5 +328,3 @@ function handleSummaryPageActions() {
     deleteButton.addEventListener("click", deleteSelected);
   }
 });
-
-

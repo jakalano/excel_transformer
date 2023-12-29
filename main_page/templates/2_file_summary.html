@@ -129,7 +129,7 @@
 <!-- Header Mismatch Notification -->
 <div class="card mb-4">
     <div class="card-body">
-        <h5 class="card-title text-danger">Header Mismatch Detected</h5>
+        <h5 class="card-title text-danger">Header Mismatch Detected!</h5>
         <p><strong>Current Headers:</strong> {% for header, is_mismatched in mismatched_headers_marked.0 %}{% if is_mismatched %}<ins>{{ header }}</ins>{% else %}{{ header }}{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
         <p><strong>Template Headers:</strong> {% for header, is_mismatched in mismatched_headers_marked.1 %}{% if is_mismatched %}<ins>{{ header }}</ins>{% else %}{{ header }}{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
         
@@ -150,11 +150,13 @@
                 <!-- Multiple select dropdown for deleting columns -->
                 <div class="col-md-6 mb-3">
                     <label for="deleteColumnsSelect" class="form-label">Select Columns to Delete:</label>
+                    
                     <select name="delete_columns[]" id="deleteColumnsSelect" multiple class="form-control">
                         {% for col in col_names %}
                         <option value="{{ col }}">{{ col }}</option>
                         {% endfor %}
                     </select>
+                    <small class="text-muted">Use CTRL to select multiple columns.</small>
                 </div>
             </div>
             <div class="text-center mt-4">
@@ -167,13 +169,13 @@
 <!-- Form to Map Headers -->
 <div class="card mb-4">
     <div class="card-body">
-        <h5 class="card-title">Map Headers</h5>
+        <h5 class="card-title">Map Headers</h5> <small class="text-muted">Leave as "-- select an option --" if the header name is correct and does not need changes.</small>
         <form action="{% url 'summary' %}" method="post">
             {% csrf_token %}
             <input type="hidden" name="map_headers" value="1">
             {% for header in mismatched_headers.0 %}
             <div class="mb-3 row">
-                <label for="header-{{ header }}" class="col-sm-4 col-form-label">Map "{{ header }}" to:</label>
+                <label for="header-{{ header }}" class="col-sm-4 col-form-label">Map "<ins>{{ header }}</ins>" to:</label>
                 <div class="col-sm-8">
                     <select name="header-{{ header }}" id="header-{{ header }}" class="form-select">
                         <option disabled selected value> -- select an option -- </option>

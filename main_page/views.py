@@ -2,7 +2,7 @@ import os
 import pandas as pd
 from datetime import datetime
 from urllib.parse import urlparse
-from django.shortcuts import render, redirect
+from django.shortcuts import get_object_or_404, render, redirect
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.urls import resolve
 from django.template import loader
@@ -15,7 +15,7 @@ from .utils import (
     handle_delete_first_x_rows, handle_delete_last_x_rows,
     handle_replace_header_with_first_row, add_column,
     delete_columns, fill_column, split_column,
-    merge_columns, rename_column, trim_and_replace_multiple_whitespaces, delete_data, replace_symbol
+    merge_columns, rename_column, trim_and_replace_multiple_whitespaces, delete_data, replace_symbol, change_case
 )
 from .forms import UploadFileForm, ParagraphErrorList
 from .models import Action, UploadedFile, Template
@@ -23,6 +23,8 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
+from django.views.decorators.csrf import csrf_exempt, csrf_protect
+from django.views.decorators.http import require_POST
 import re
 import json
 
@@ -223,6 +225,19 @@ def apply_action(df, action_type, parameters, is_undo=False):
 
                 for column in columns_to_replace:
                     df = replace_symbol(df, columns_to_replace, old_symbol, new_symbol, case_sensitive)
+
+            elif action_type == 'trim_and_replace_whitespaces':
+                columns_to_modify = parameters.get('columns_to_modify')
+                if columns_to_modify == 'All Columns':
+                    columns_to_modify = df.columns.tolist()
+                df = apply_trim_and_replace_whitespaces(df, columns_to_modify)
+
+            elif action_type == 'change_case':
+                columns_to_change_case = parameters.get('columns_to_change_case')
+                case_type = parameters.get('case_type')
+                if columns_to_change_case == 'All Columns':
+                    columns_to_change_case = df.columns.tolist()
+                df = apply_change_case(df, columns_to_change_case, case_type)
                 
 
         else:
@@ -818,8 +833,49 @@ def edit_data(request):
         elif action == 'trim_and_replace_whitespaces':
             columns_to_modify = request.POST.getlist('columns_to_trim')
             apply_to_all = '__all__' in columns_to_modify
+            try:
+                df_v3 = trim_and_replace_multiple_whitespaces(df_v3, columns_to_modify, replace_all=apply_to_all)
+                messages.success(request, 'Unnecessary whitespaces replaced successfully.')
+            except ValueError as e:
+                messages.error(request, str(e))
+            record_action(
+                uploaded_file=uploaded_file_instance,
+                action_type='trim_and_replace_whitespaces',
+                parameters={
+                    'columns_to_modify': columns_to_modify if not apply_to_all else 'All Columns'
+                },
+                user=request.user,
+                session_id=request.session.session_key
+            )
 
-            df_v3 = trim_and_replace_multiple_whitespaces(df_v3, columns_to_modify, replace_all=apply_to_all)
+
+        elif action == 'change_case':
+            columns_to_change_case = request.POST.getlist('columns_to_change_case')
+            case_type = request.POST.get('case_type')
+            apply_to_all = '__all__' in columns_to_change_case
+
+            if apply_to_all:
+                columns_to_change_case = df_v3.columns.tolist()
+
+            try:
+                df_v3 = change_case(df_v3, columns_to_change_case, case_type)
+                messages.success(request, 'Case changed successfully.')
+            except ValueError as e:
+                messages.error(request, str(e))
+
+            record_action(
+                uploaded_file=uploaded_file_instance,
+                action_type='change_case',
+                parameters={
+                    'columns_to_change_case': columns_to_change_case if not apply_to_all else 'All Columns',
+                    'case_type': case_type
+                },
+                user=request.user,
+                session_id=request.session.session_key
+            )
+
+
+
        
 
         save_dataframe(df_v3, temp_file_path)
@@ -963,3 +1019,40 @@ def map_headers(request):
 
     return redirect('summary')
 
+@csrf_exempt
+def delete_file(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        if data.get('delete'):
+            file_path = request.session.get('file_path')
+            if file_path:
+                try:
+                    os.remove(file_path)
+                    del request.session['file_path']  # Remove file path from session
+                    return JsonResponse({'status': 'success'}, status=200)
+                except Exception as e:
+                    return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+            else:
+                return JsonResponse({'status': 'error', 'message': 'File path not found.'}, status=404)
+    return JsonResponse({'status': 'error', 'message': 'Invalid request.'}, status=400)
+
+@login_required
+@require_POST
+@csrf_protect
+def delete_template(request, template_id):
+    # Get the template object, ensuring it belongs to the current user
+    template = get_object_or_404(Template, id=template_id, user=request.user)
+
+    try:
+        template.delete()
+        messages.success(request, 'Template deleted successfully.')
+        # Redirect after successful deletion
+        return redirect('user_profile')
+        # Or, return a JSON response for AJAX
+        # return JsonResponse({'status': 'success', 'message': 'Template deleted successfully.'})
+    except Exception as e:
+        messages.error(request, f'Error deleting template: {str(e)}')
+        # Redirect after failure
+        return redirect('user_profile')
+        # Or, return a JSON response for AJAX
+        # return JsonResponse({'status': 'error', 'message': f'Error deleting template: {str(e)}'})

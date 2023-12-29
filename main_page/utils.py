@@ -264,7 +264,22 @@ def trim_and_replace_multiple_whitespaces(df, columns_to_modify=None, replace_al
     # Apply the whitespace modifications.
     for column in columns_to_modify:
         if column in df.columns:
+            try:
             # Use regex to replace multiple spaces with a single space and strip leading/trailing spaces.
-            df[column] = df[column].astype(str).apply(lambda x: re.sub(r'\s+', ' ', x).strip())
-    
+                df[column] = df[column].astype(str).apply(lambda x: re.sub(r'\s+', ' ', x).strip())
+            except Exception as e:
+                print(f"Error processing column {column}: {e}")
+    return df
+
+def change_case(df, columns, case_type):
+    for column in columns:
+        if column in df.columns:
+            if case_type == 'upper':
+                df[column] = df[column].str.upper()
+            elif case_type == 'lower':
+                df[column] = df[column].str.lower()
+            elif case_type == 'title':
+                df[column] = df[column].str.title()
+            elif case_type == 'sentence':
+                df[column] = df[column].apply(lambda x: x.capitalize() if isinstance(x, str) else x)
     return df

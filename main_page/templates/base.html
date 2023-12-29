@@ -20,13 +20,13 @@
     <link rel="stylesheet" type="text/css" href="{% static 'custom.css' %}" />
    
   
-    <title>Excel failu pārveidotājs</title>
+    <title>Excel file transformer</title>
   </head>
   <body>
   <!-- Navigation Bar -->
   <nav class="navbar navbar-expand-lg navbar-light bg-light sticky-top">
     <div class="container-fluid">
-      <a class="navbar-brand" href="/">Excel failu pārveidotājs</a>
+      <a class="navbar-brand" href="/">Excel file transformer</a>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavDropdown" aria-controls="navbarNavDropdown" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
       </button>
@@ -34,21 +34,21 @@
           <ul class="navbar-nav me-auto mb-2 mb-lg-0">
             <li class="nav-item">
               <a class="nav-link {% if active_page == 'home' %}active{% endif %}" aria-current="page" href="/"
-                >Galvenā lapa</a
+                >Upload file</a
               >
             </li>
             <li class="nav-item">
-              <a class="nav-link {% if active_page == 'summary' %}active{% endif %}" href="{% url 'summary' %}">Informācija par failu</a>
+              <a class="nav-link {% if active_page == 'summary' %}active{% endif %}" href="{% url 'summary' %}">File summary</a>
             </li>
             <li class="nav-item">
-              <a class="nav-link {% if active_page == 'edit_columns' %}active{% endif %}" href="{% url 'edit_columns' %}">Labot kolonnas</a>
+              <a class="nav-link {% if active_page == 'edit_columns' %}active{% endif %}" href="{% url 'edit_columns' %}">Edit columns</a>
             </li>
             <li class="nav-item">
-              <a class="nav-link {% if active_page == 'edit_data' %}active{% endif %}" href="{% url 'edit_data' %}">Labot datus</a>
+              <a class="nav-link {% if active_page == 'edit_data' %}active{% endif %}" href="{% url 'edit_data' %}">Edit data</a>
             </li>
             
             <li class="nav-item">
-              <a class="nav-link {% if active_page == 'download' %}active{% endif %}" href="{% url 'download' %}">Lejupielādēt</a>
+              <a class="nav-link {% if active_page == 'download' %}active{% endif %}" href="{% url 'download' %}">Download</a>
             </li></ul>
             <span class="nav-item  me-4">
             {% if user.is_authenticated %}
@@ -64,9 +64,9 @@
               {{ user.username }}
               </a>
               <ul class="dropdown-menu dropdown-menu-end">
-                <li><a class="dropdown-item {% if active_page == 'user_profile' %}active{% endif %}" href="{% url 'user_profile' %}">Mans konts</a></li>
+                <li><a class="dropdown-item {% if active_page == 'user_profile' %}active{% endif %}" href="{% url 'user_profile' %}">My account</a></li>
                 
-                <li><a class="dropdown-item" href="{% url 'logout' %}">Izrakstīties</a></li>
+                <li><a class="dropdown-item" href="{% url 'logout' %}">Log out</a></li>
               </ul>
 
             </span>
@@ -74,10 +74,10 @@
               <span class="nav-item">
                 <div class="nav-item d-flex">
                   <span class="me-2">
-                      <a class="nav-link {% if active_page == 'login' %}active{% endif %}" href="{% url 'login' %}">Pierakstīties</a>
+                      <a class="nav-link {% if active_page == 'login' %}active{% endif %}" href="{% url 'login' %}">Log in</a>
                   </span>
                   <span>
-                      <a class="nav-link {% if active_page == 'register' %}active{% endif %}" href="{% url 'register' %}">Reģistrēties</a>
+                      <a class="nav-link {% if active_page == 'register' %}active{% endif %}" href="{% url 'register' %}">Register</a>
                   </span>
               </div></span>
                 {% endif %}</span>
@@ -85,11 +85,21 @@
         </div>
       </div>
     </nav>
-    <div class="d-flex flex-column justify-content-between" style="height: 90vh">
+    <div class="d-flex flex-column justify-content-between">
       <!-- Main Content Container -->
       <div class="container-fluid mt-5 flex-grow-1">
         <div class="p-4 border border-gray rounded">
           <h1 class="text-center">{{ original_file_name }}</h1>
+          {% if original_file_name %}
+          <button id="deleteFileBtn"  data-url="{% url 'delete_file' %}" data-csrf="{{ csrf_token }}" class="btn btn-danger">Delete File</button>
+      {% endif %}
+          <!-- Alert Messages -->
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    {% endfor %}
           {% block content %}{% endblock %}
         </div>
       </div>
@@ -98,10 +108,10 @@
       <nav aria-label="Main navigation" class="mt-auto">
         <ul class="pagination justify-content-center">
           <li class="page-item {% if previous_page_url == None %}disabled{% endif %}">
-            <a class="page-link" href="{% if previous_page_url != None %}{% url previous_page_url %}{% endif %}">Iepriekšējā sadaļa</a>
+            <a class="page-link" href="{% if previous_page_url != None %}{% url previous_page_url %}{% endif %}">Previous page</a>
           </li>
           <li class="page-item {% if next_page_url == None %}disabled{% endif %}">
-            <a class="page-link" href="{% if next_page_url != None %}{% url next_page_url %}{% endif %}">Nākamā sadaļa</a>
+            <a class="page-link" href="{% if next_page_url != None %}{% url next_page_url %}{% endif %}">Next page</a>
           </li>
         </ul>
       </nav>
