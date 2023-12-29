@@ -144,19 +144,25 @@ def handle_remove_empty_cols(df, cols_to_delete):
 
 def handle_delete_first_x_rows(df, num_rows_to_delete_start):
     try:
-        if num_rows_to_delete_start > 0:
-            return df.iloc[num_rows_to_delete_start:]
-        return df
+        initial_row_count = df.shape[0]
+        df = df.iloc[num_rows_to_delete_start:]
+        final_row_count = df.shape[0]
+        rows_deleted = initial_row_count - final_row_count
+        return df, rows_deleted
     except Exception as e:
         raise ValueError(f"Error while deleting the first {num_rows_to_delete_start} rows: {e}")
 
 def handle_delete_last_x_rows(df, num_rows_to_delete_end):
     try:
+        initial_row_count = df.shape[0]
         if num_rows_to_delete_end > 0:
-            return df.iloc[:-num_rows_to_delete_end]
-        return df
+            df = df.iloc[:-num_rows_to_delete_end]
+        final_row_count = df.shape[0]
+        rows_deleted = initial_row_count - final_row_count
+        return df, rows_deleted
     except Exception as e:
         raise ValueError(f"Error while deleting the last {num_rows_to_delete_end} rows: {e}")
+
 
 def handle_replace_header_with_first_row(df):
     try:

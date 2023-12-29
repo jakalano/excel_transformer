@@ -333,6 +333,10 @@ def summary(request):
     file_path = request.session.get('file_path')
     df_v1 = load_dataframe_from_file(temp_file_path)
     print(file_path)
+        # Check if a file has been uploaded
+    if not temp_file_path or not file_path:
+        messages.error(request, "No file uploaded. Please upload a file to proceed.")
+        return redirect('main_page')
     # Extract the relative path using MEDIA_ROOT
     relative_path = os.path.relpath(file_path, settings.MEDIA_ROOT).replace('\\', '/')
     print(relative_path)
@@ -391,24 +395,29 @@ def summary(request):
 
         if 'num_rows_to_delete_start' in request.POST:
             try:
-                num_rows_to_delete_start = int(request.POST.get('num_rows_to_delete_start', 0))
-                df_v1, _ = handle_delete_first_x_rows(df_v1, num_rows_to_delete_start)
-                messages.success(request, f'First {num_rows_to_delete_start} rows deleted successfully.')
+                num_rows_to_delete_start = request.POST.get('num_rows_to_delete_start', '0').strip()
+                if num_rows_to_delete_start.isdigit():
+                    num_rows_to_delete_start = int(num_rows_to_delete_start)
+                else:
+                    num_rows_to_delete_start = 0
+                if num_rows_to_delete_start > 0:
+                    df_v1, _ = handle_delete_first_x_rows(df_v1, num_rows_to_delete_start)
+                    messages.success(request, f'First {num_rows_to_delete_start} rows deleted successfully.')
 
-                record_action(        
-                        uploaded_file=uploaded_file_instance,
-                        action_type='delete_first_X_rows',
-                        parameters={'num_rows_to_delete_start': num_rows_to_delete_start},
-                        user=request.user,
-                        session_id=request.session.session_key,
-                        )
+                    record_action(        
+                            uploaded_file=uploaded_file_instance,
+                            action_type='delete_first_X_rows',
+                            parameters={'num_rows_to_delete_start': num_rows_to_delete_start},
+                            user=request.user,
+                            session_id=request.session.session_key,
+                            )
             except ValueError as e:
                 messages.error(request, str(e))
         
         # if replace_header is True, set the df columns to the first row's values
         if 'replace_header' in request.POST:
             try:
-                df_v1, _ = handle_replace_header_with_first_row(df_v1)
+                df_v1 = handle_replace_header_with_first_row(df_v1)
                 messages.success(request, 'Header replaced with the first row successfully.')
 
                 record_action(        
@@ -424,17 +433,22 @@ def summary(request):
 # Handle deletion of the last X rows
         if 'num_rows_to_delete_end' in request.POST:
             try:
-                num_rows_to_delete_end = int(request.POST.get('num_rows_to_delete_end', 0))
-                df_v1, _ = handle_delete_last_x_rows(df_v1, num_rows_to_delete_end)
-                messages.success(request, f'Last {num_rows_to_delete_end} rows deleted successfully.')
+                num_rows_to_delete_end = request.POST.get('num_rows_to_delete_end', '0').strip()
+                if num_rows_to_delete_end.isdigit():
+                    num_rows_to_delete_end = int(num_rows_to_delete_end)
+                else:
+                    num_rows_to_delete_end = 0
+                if num_rows_to_delete_end > 0:
+                    df_v1, _ = handle_delete_last_x_rows(df_v1, num_rows_to_delete_end)
+                    messages.success(request, f'Last {num_rows_to_delete_end} rows deleted successfully.')
 
-                record_action(        
-                        uploaded_file=uploaded_file_instance,
-                        action_type='delete_last_X_rows',
-                        parameters={'num_rows_to_delete_end': num_rows_to_delete_end},
-                        user=request.user,
-                        session_id=request.session.session_key,
-                        )
+                    record_action(        
+                            uploaded_file=uploaded_file_instance,
+                            action_type='delete_last_X_rows',
+                            parameters={'num_rows_to_delete_end': num_rows_to_delete_end},
+                            user=request.user,
+                            session_id=request.session.session_key,
+                            )
             except ValueError as e:
                 messages.error(request, str(e))
         
@@ -555,6 +569,10 @@ def summary(request):
 def edit_columns(request):
     temp_file_path = request.session.get('temp_file_path')
     file_path = request.session.get('file_path')
+        # Check if a file has been uploaded
+    if not temp_file_path or not file_path:
+        messages.error(request, "No file uploaded. Please upload a file to proceed.")
+        return redirect('main_page')
     # Extract the relative path using MEDIA_ROOT
     relative_path = os.path.relpath(file_path, settings.MEDIA_ROOT).replace('\\', '/')
 
@@ -700,6 +718,10 @@ def edit_data(request):
 
     temp_file_path = request.session.get('temp_file_path')
     file_path = request.session.get('file_path')
+    # Check if a file has been uploaded
+    if not temp_file_path or not file_path:
+        messages.error(request, "No file uploaded. Please upload a file to proceed.")
+        return redirect('main_page')
     # Extract the relative path using MEDIA_ROOT
     relative_path = os.path.relpath(file_path, settings.MEDIA_ROOT).replace('\\', '/')
 
@@ -900,8 +922,15 @@ def edit_data(request):
 
 
 def download(request):
-    temp_file_path = request.session.get('temp_file_path', 'data')  # default to 'data'
-    file_path = request.session.get('file_path', 'data')
+    temp_file_path = request.session.get('temp_file_path')  # default to 'data'
+    file_path = request.session.get('file_path')
+
+    # Check if a file has been uploaded
+    if not temp_file_path or not file_path:
+        messages.error(request, "No file uploaded. Please upload a file to proceed.")
+        return redirect('main_page')
+
+
     context = {
         'original_file_name': os.path.basename(file_path),
         'previous_page_url': 'edit_columns',
