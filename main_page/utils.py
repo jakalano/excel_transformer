@@ -199,6 +199,47 @@ def rename_column(df, column_to_rename, new_column_name):
 
 ################## edit_data view actions ###################
 
+def delete_data(df, columns_to_modify, delimiter, delete_option, include_delimiter):
+    for column in columns_to_modify:
+        if column in df.columns:
+            # converts entire column to strings, replacing NaN with empty strings
+            column_series = df[column].fillna('').astype(str)
+            try:
+                # print(f"Before operation: {column_series.head()}")
+                if include_delimiter:
+                    # if the user wants to delete the delimiter along with the data
+                    if delete_option == 'before':
+                        df[column] = column_series.apply(lambda x: x.split(delimiter)[-1] if delimiter in x else x)
+                    elif delete_option == 'after':
+                        df[column] = column_series.apply(lambda x: x.split(delimiter)[0] if delimiter in x else x)
+                else:
+                    # if the user wants to keep the delimiter
+                    if delete_option == 'before':
+                        df[column] = column_series.apply(lambda x: x.split(delimiter, 1)[-1] if delimiter in x else x)
+                    elif delete_option == 'after':
+                        # appends the delimiter after the operation if it's not to be deleted
+                        df[column] = column_series.apply(lambda x: delimiter + x.split(delimiter, 1)[-1] if delimiter in x else x)
+                        # print(f"After operation: {df_v3[column].head()}")
+            except Exception as e:
+                raise ValueError(f"Error processing column {column}: {e}")
+    return df
+
+def replace_symbol(df, columns_to_replace, old_symbol, new_symbol, case_sensitive):
+    for column in columns_to_replace:
+        if column in df.columns:
+            try:
+                #print(f"Before operation: {df_v3[column].head()}")
+                if case_sensitive:
+                    # case sensitive replacement
+                    df[column] = df[column].str.replace(old_symbol, new_symbol, regex=True)
+                else:
+                    # case insensitive replacement
+                    df[column] = df[column].str.replace(old_symbol, new_symbol, case=False, regex=True)
+                #print(f"After operation: {df_v3[column].head()}")
+            except Exception as e:
+                print(f"Error processing column {column}: {e}")
+    return df
+
 def trim_and_replace_multiple_whitespaces(df, columns_to_modify=None, replace_all=False):
     # If replace_all is True, set columns_to_modify to all columns.
     if replace_all:

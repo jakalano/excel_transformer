@@ -15,7 +15,7 @@ from .utils import (
     handle_delete_first_x_rows, handle_delete_last_x_rows,
     handle_replace_header_with_first_row, add_column,
     delete_columns, fill_column, split_column,
-    merge_columns, rename_column, trim_and_replace_multiple_whitespaces
+    merge_columns, rename_column, trim_and_replace_multiple_whitespaces, delete_data, replace_symbol
 )
 from .forms import UploadFileForm, ParagraphErrorList
 from .models import Action, UploadedFile, Template
@@ -222,10 +222,7 @@ def apply_action(df, action_type, parameters, is_undo=False):
                 case_sensitive = parameters.get('case_sensitive')
 
                 for column in columns_to_replace:
-                    if case_sensitive:
-                        df[column] = df[column].str.replace(old_symbol, new_symbol, regex=True)
-                    else:
-                        df[column] = df[column].str.replace(old_symbol, new_symbol, case=False, regex=True)
+                    df = replace_symbol(df, columns_to_replace, old_symbol, new_symbol, case_sensitive)
                 
 
         else:
@@ -707,30 +704,11 @@ def edit_data(request):
             if apply_to_all:
                 columns_to_modify = df_v3.columns.tolist()  # lists all columns if '--ALL COLUMNS--' is selected
 
-            for column in columns_to_modify:
-                if column in df_v3.columns:
-                    # converts entire column to strings, replacing NaN with empty strings
-                    column_series = df_v3[column].fillna('').astype(str)
-                    try:
-                        # print(f"Before operation: {column_series.head()}")
-                        if include_delimiter:
-                            # if the user wants to delete the delimiter along with the data
-                            if delete_option == 'before':
-                                df_v3[column] = column_series.apply(lambda x: x.split(delimiter)[-1] if delimiter in x else x)
-                            elif delete_option == 'after':
-                                df_v3[column] = column_series.apply(lambda x: x.split(delimiter)[0] if delimiter in x else x)
-                        else:
-                            # if the user wants to keep the delimiter
-                            if delete_option == 'before':
-                                df_v3[column] = column_series.apply(lambda x: x.split(delimiter, 1)[-1] if delimiter in x else x)
-                            elif delete_option == 'after':
-                                # appends the delimiter after the operation if it's not to be deleted
-                                df_v3[column] = column_series.apply(lambda x: delimiter + x.split(delimiter, 1)[-1] if delimiter in x else x)
-                                # print(f"After operation: {df_v3[column].head()}")
-                    except Exception as e:
-                        print(f"Error processing column {column}: {e}")
-            
-            messages.success(request, f'Data deleted successfully based on your criteria.')
+            try:
+                df_v3 = delete_data(df_v3, columns_to_modify, delimiter, delete_option, include_delimiter)
+                messages.success(request, 'Data deleted successfully based on your criteria.')
+            except ValueError as e:
+                messages.error(request, str(e))
             df_backup = df_v3[columns_to_modify].copy()  # Backup the original data
             record_action(
                 uploaded_file=uploaded_file_instance,        
@@ -758,21 +736,13 @@ def edit_data(request):
             if apply_to_all:
                 columns_to_replace = df_v3.columns.tolist()  # lists all columns if '--ALL COLUMNS--' is selected
 
+            try:
+                df_v3 = replace_symbol(df_v3, columns_to_replace, old_symbol, new_symbol, case_sensitive)
+                messages.success(request, 'Symbols replaced successfully.')
+            except ValueError as e:
+                messages.error(request, str(e))
 
-            for column in columns_to_replace:
-                if column in df_v3.columns:
-                    try:
-                        #print(f"Before operation: {df_v3[column].head()}")
-                        if case_sensitive:
-                            # case sensitive replacement
-                            df_v3[column] = df_v3[column].str.replace(old_symbol, new_symbol, regex=True)
-                        else:
-                            # case insensitive replacement
-                            df_v3[column] = df_v3[column].str.replace(old_symbol, new_symbol, case=False, regex=True)
-                        #print(f"After operation: {df_v3[column].head()}")
-                    except Exception as e:
-                        print(f"Error processing column {column}: {e}")
-            messages.success(request, f'Symbols replaced successfully.')
+           
             record_action(
                 uploaded_file=uploaded_file_instance,        
                 action_type='replace_symbol',
