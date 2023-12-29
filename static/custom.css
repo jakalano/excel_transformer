@@ -61,3 +61,7 @@
 select option:checked, select option:active, select option:focus{
   background-color: rgb(220, 124, 124) !important;
 }
+
+.preserve-whitespace {
+  white-space: pre-wrap; /* CSS property to preserve whitespace and wrap text */
+}

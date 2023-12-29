@@ -53,6 +53,25 @@
       </form>
         <br><br>
 
+        <div class="container mt-4">
+          <h2>Trim and Clean Whitespace</h2>
+          <form method="post" action="{% url 'edit_data' %}">
+              {% csrf_token %}
+              <div class="mb-3">
+                  <label for="columns_to_trim" class="form-label">Select Columns:</label>
+                  <select name="columns_to_trim" id="columns_to_trim" multiple class="form-select">
+                      <option value="__all__">--ALL COLUMNS--</option>
+                      {% for column in df_v3.columns %}
+                          <option value="{{ column }}">{{ column }}</option>
+                      {% endfor %}
+                  </select>
+                  <small class="text-muted">Use CTRL to select multiple columns or select '--ALL COLUMNS--' to apply to all.</small>
+              </div>
+              <button type="submit" name="action" value="trim_and_replace_whitespaces" class="btn btn-primary">Trim and Clean Whitespace</button>
+          </form>
+      </div>
+      <br><br>
+
     <form method="post" action="{% url 'edit_data' %}">
       {% csrf_token %}
 <!-- Form for Data Validation -->
@@ -104,7 +123,7 @@
       <!-- Display duplicates with checkmarks -->
       <form id="duplicatesForm" method="post" action="{% url 'edit_data' %}">
           {% csrf_token %}
-          <div class="scrollable-table" id="duplicates-table">
+          <div class="scrollable-table preserve-whitespace" id="duplicates-table">
               <!-- JavaScript will populate this with duplicate rows -->
           </div>
           <button type="button" onclick="deleteSelected()">Delete Selected</button>

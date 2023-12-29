@@ -15,7 +15,7 @@ from .utils import (
     handle_delete_first_x_rows, handle_delete_last_x_rows,
     handle_replace_header_with_first_row, add_column,
     delete_columns, fill_column, split_column,
-    merge_columns, rename_column
+    merge_columns, rename_column, trim_and_replace_multiple_whitespaces
 )
 from .forms import UploadFileForm, ParagraphErrorList
 from .models import Action, UploadedFile, Template
@@ -48,7 +48,7 @@ def main_page(request):
             
             save_dataframe(df_orig, temp_file_path, file_format='csv')
             df_orig = load_dataframe_from_file(temp_file_path)
-            html_table = dataframe_to_html(df_orig,classes='table table-striped')
+            html_table = dataframe_to_html(df_orig,classes='table table-striped preserve-whitespace')
             request.session['html_table'] = html_table
             request.session['temp_file_path'] = temp_file_path
             print(temp_file_path)
@@ -523,7 +523,7 @@ def summary(request):
         'mismatched_headers': mismatched_headers,
         'mismatched_headers_marked': mismatched_headers_marked,
         'template_application_success': template_application_success,
-        'table': dataframe_to_html(df_v1, classes='table table-striped'),
+        'table': dataframe_to_html(df_v1, classes='table table-striped preserve-whitespace'),
         'original_file_name': os.path.basename(file_path),
         'templates': user_templates,
         'previous_page_url': 'main_page',
@@ -671,7 +671,7 @@ def edit_columns(request):
         'previous_page_url': 'summary',
         'active_page': 'edit_columns',
         'next_page_url': 'edit_data',
-        'table': dataframe_to_html(df_v2, classes='table table-striped'),
+        'table': dataframe_to_html(df_v2, classes='table table-striped preserve-whitespace'),
         'original_file_name': os.path.basename(file_path),
         'df_v2': df_v2,  # passes the df to the template context
     }
@@ -836,7 +836,14 @@ def edit_data(request):
                 # sets the JSON data in the session
                 request.session['duplicates_json'] = duplicates_json
             print(f"Found {len(duplicates)} duplicates")
-            # TODO implement filter for all duplicate values in the table        
+            # TODO implement filter for all duplicate values in the table 
+
+        elif action == 'trim_and_replace_whitespaces':
+            columns_to_modify = request.POST.getlist('columns_to_trim')
+            apply_to_all = '__all__' in columns_to_modify
+
+            df_v3 = trim_and_replace_multiple_whitespaces(df_v3, columns_to_modify, replace_all=apply_to_all)
+       
 
         save_dataframe(df_v3, temp_file_path)
         return redirect('edit_data')
@@ -847,7 +854,7 @@ def edit_data(request):
         'previous_page_url': 'edit_columns',
         'active_page': 'edit_data',
         'next_page_url': 'download',
-        'table': dataframe_to_html(df_v3, classes='table table-striped'),
+        'table': dataframe_to_html(df_v3, classes='table table-striped preserve-whitespace'),
         'original_file_name': os.path.basename(file_path),
         'df_v3': df_v3,  # Pass the df to the template context
         'duplicates_json': request.session.get('duplicates_json', '[]'),  # pass the duplicates as JSON

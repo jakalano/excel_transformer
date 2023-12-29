@@ -15,13 +15,7 @@ def detect_delimiter(file_path, num_lines=5):
     return delimiter
 
 def load_dataframe_from_file(file_path):
-    """
-    Load the latest version of a DataFrame from the directory where the original file is stored.
 
-    :param original_file_path: Path to the original file
-    :param view_name: Name of the view or stage
-    :return: The loaded DataFrame
-    """
     file_extension = os.path.splitext(file_path)[1].lower()
     
 
@@ -36,12 +30,7 @@ def load_dataframe_from_file(file_path):
         raise ValueError("Unsupported file type: {}".format(file_extension))
     
 def save_dataframe(df, save_path, file_format=None):
-    """
-    Save a DataFrame to a file, optionally in a user-specified format.
-    :param df: DataFrame to save
-    :param save_path: Path to save the file
-    :param file_format: Format to save the file in (optional, if None, infer from save_path)
-    """
+
     # Infer file format from save_path if not provided
     if file_format is None:
         _, file_format = os.path.splitext(save_path)
@@ -70,18 +59,16 @@ def save_dataframe(df, save_path, file_format=None):
     return save_path
 
 def dataframe_to_html(df, classes=None):
-    """Convert a DataFrame to an HTML table."""
+
     df.columns = [col for col, dtype in zip(df.columns, df.dtypes)]
-    
+
     # Convert NaN values to an empty string and convert DataFrame to HTML
     return df.fillna('').to_html(classes=classes, escape=False)
 
 
 
 def record_action(uploaded_file, action_type, parameters, user, session_id, df_backup=None):
-    """
-    Record an action performed by a user, including a backup of the DataFrame if provided.
-    """
+
     # Check if the user is authenticated
     if user.is_authenticated:
         user_instance = user
@@ -111,18 +98,13 @@ def record_action(uploaded_file, action_type, parameters, user, session_id, df_b
 
 
 def save_as_template(user, actions, template_name):
-    """
-    Save actions as a template.
-    """
+
     template = Template.objects.create(name=template_name, user=user)
     template.actions.add(*actions)
     return template
 
 def get_actions_for_session(session_key, uploaded_file, exclude_last_action=False):
-    """
-    Retrieves actions for a given session and uploaded file.
-    Optionally excludes the last action.
-    """
+
     actions = Action.objects.filter(session_id=session_key, uploaded_file=uploaded_file)
     if exclude_last_action and actions.exists():
         last_action = actions.latest('timestamp')
@@ -130,15 +112,7 @@ def get_actions_for_session(session_key, uploaded_file, exclude_last_action=Fals
     return actions
 
 def action_to_dict(action):
-    """
-    Converts an Action model instance into a dictionary.
 
-    Args:
-        action (Action): The Action model instance.
-
-    Returns:
-        dict: A dictionary representation of the Action.
-    """
     return {
         'action_type': action.action_type,
         'parameters': action.parameters,
@@ -148,7 +122,6 @@ def action_to_dict(action):
 ################## summary view actions ###################
 
 def remove_empty_rows(df):
-    """Remove all rows from a DataFrame that contain only NaN values."""
     return df.dropna(how='all')
 
 def handle_remove_empty_rows(df):
@@ -225,3 +198,19 @@ def rename_column(df, column_to_rename, new_column_name):
     return df
 
 ################## edit_data view actions ###################
+
+def trim_and_replace_multiple_whitespaces(df, columns_to_modify=None, replace_all=False):
+    # If replace_all is True, set columns_to_modify to all columns.
+    if replace_all:
+        columns_to_modify = df.columns.tolist()
+    elif not columns_to_modify:
+        # If columns_to_modify is None or empty, modify all columns
+        columns_to_modify = df.columns.tolist()
+    
+    # Apply the whitespace modifications.
+    for column in columns_to_modify:
+        if column in df.columns:
+            # Use regex to replace multiple spaces with a single space and strip leading/trailing spaces.
+            df[column] = df[column].astype(str).apply(lambda x: re.sub(r'\s+', ' ', x).strip())
+    
+    return df
