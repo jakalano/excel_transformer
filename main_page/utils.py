@@ -121,36 +121,49 @@ def action_to_dict(action):
 
 ################## summary view actions ###################
 
-def remove_empty_rows(df):
-    return df.dropna(how='all')
 
 def handle_remove_empty_rows(df):
-    initial_row_count = df.shape[0]
-    df = df.dropna(how='all')
-    final_row_count = df.shape[0]
-    rows_removed = initial_row_count - final_row_count
-    return df, rows_removed
+    try:
+        initial_row_count = df.shape[0]
+        df = df.dropna(how='all')
+        final_row_count = df.shape[0]
+        rows_removed = initial_row_count - final_row_count
+        return df, rows_removed
+    except Exception as e:
+        raise ValueError(f"Error while removing empty rows: {e}")
 
 def handle_remove_empty_cols(df, cols_to_delete):
-    initial_col_count = df.shape[1]
-    df = df.drop(columns=cols_to_delete)
-    final_col_count = df.shape[1]
-    cols_removed = initial_col_count - final_col_count
-    return df, cols_removed
+    try:
+        initial_col_count = df.shape[1]
+        df = df.drop(columns=cols_to_delete)
+        final_col_count = df.shape[1]
+        cols_removed = initial_col_count - final_col_count
+        return df, cols_removed
+    except Exception as e:
+        raise ValueError(f"Error while removing empty columns: {e}")
 
 def handle_delete_first_x_rows(df, num_rows_to_delete_start):
-    if num_rows_to_delete_start > 0:
-        return df.iloc[num_rows_to_delete_start:]
-    return df
+    try:
+        if num_rows_to_delete_start > 0:
+            return df.iloc[num_rows_to_delete_start:]
+        return df
+    except Exception as e:
+        raise ValueError(f"Error while deleting the first {num_rows_to_delete_start} rows: {e}")
 
 def handle_delete_last_x_rows(df, num_rows_to_delete_end):
-    if num_rows_to_delete_end > 0:
-        return df.iloc[:-num_rows_to_delete_end]
-    return df
+    try:
+        if num_rows_to_delete_end > 0:
+            return df.iloc[:-num_rows_to_delete_end]
+        return df
+    except Exception as e:
+        raise ValueError(f"Error while deleting the last {num_rows_to_delete_end} rows: {e}")
 
 def handle_replace_header_with_first_row(df):
-    df.columns = df.iloc[0]
-    return df.iloc[1:]
+    try:
+        df.columns = df.iloc[0]
+        return df.iloc[1:]
+    except Exception as e:
+        raise ValueError("Error while replacing header with the first row: {e}")
 
 
 ################## edit_columns view actions ###################

@@ -1,151 +1,210 @@
-{% extends "base.html" %} 
+{% extends "base.html" %}
 {% load static %}
 {% block content %}
 <div class="container">
-
-  <br>
+    <br>
     {% for message in messages %}
     <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
         {{ message }}
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
-{% endfor %}
-<br>
-    <form method="post" action="{% url 'edit_data' %}">
-      {% csrf_token %}
+    {% endfor %}
+    <br>
 
-      <!-- Form for deleting data based on a delimiter -->
-      <h2>Delete values before/after specific symbol</h2>
-      <select name="columns_to_modify" multiple class="column-selector">
-        <option value="__all__">--ALL COLUMNS--</option> <!-- Special value to indicate all columns -->
-        {% for column in df_v3.columns %}
-          <option value="{{ column }}">{{ column }}</option>
-        {% endfor %}
-      </select>
-      <input type="text" name="delimiter" placeholder="Enter delimiter">
-      <select name="delete_option">
-        <option value="before">Delete Before</option>
-        <option value="after">Delete After</option>
-      </select>
-      <input type="checkbox" name="include_delimiter" id="include_delimiter" checked>
-    <label for="include_delimiter">Include Delimiter in Deletion</label>
-      <!-- <input type="hidden" name="action" value="delete_data"> Hidden input for the action -->
-      <button type="submit" name="action" value="delete_data">Delete Data</button>
-    </form>
-      <br><br>
+    <!-- Form for Deleting Data Based on a Delimiter -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Delete Values Based on Symbol</h5>
+            <form method="post" action="{% url 'edit_data' %}">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="columns_to_modify" class="form-label">Select Columns:</label>
+                    <select name="columns_to_modify" id="columns_to_modify" multiple class="form-select">
+                        <option value="__all__">--ALL COLUMNS--</option>
+                        {% for column in df_v3.columns %}
+                        <option value="{{ column }}">{{ column }}</option>
+                        {% endfor %}
+                    </select>
+                    <small class="text-muted">Use CTRL to select multiple columns or select '--ALL COLUMNS--' to apply to all.</small>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <input type="text" name="delimiter" class="form-control" placeholder="Enter delimiter">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <select name="delete_option" class="form-select">
+                            <option value="before">Delete Before</option>
+                            <option value="after">Delete After</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-check mb-3">
+                    <input type="checkbox" class="form-check-input" name="include_delimiter" id="include_delimiter" checked>
+                    <label class="form-check-label" for="include_delimiter">Include Delimiter in Deletion</label>
+                </div>
+                <div class="text-center">
+                    <button type="submit" class="btn btn-danger" name="action" value="delete_data">Delete Data</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-      <form method="post" action="{% url 'edit_data' %}">
-        {% csrf_token %}
-    <!-- New form for replacing symbols in a column -->
-    <h2>Replace symbols</h2>
-        <select name="columns_to_replace" multiple class="column-selector">
-            <option value="__all__">--ALL COLUMNS--</option> <!-- Special value to indicate all columns -->
-          {% for column in df_v3.columns %}
-            <option value="{{ column }}">{{ column }}</option>
-          {% endfor %}
-        </select>
-        <input type="text" name="old_symbol" placeholder="Enter symbol to replace">
-        <input type="text" name="new_symbol" placeholder="Enter new symbol">
+    <!-- Form for Replacing Symbols in a Column -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Replace Symbols in Columns</h5>
+            <form method="post" action="{% url 'edit_data' %}">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="columns_to_replace" class="form-label">Select Columns:</label>
+                    <select name="columns_to_replace" id="columns_to_replace" multiple class="form-select">
+                        <option value="__all__">--ALL COLUMNS--</option>
+                        {% for column in df_v3.columns %}
+                        <option value="{{ column }}">{{ column }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <input type="text" name="old_symbol" class="form-control" placeholder="Enter symbol to replace">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <input type="text" name="new_symbol" class="form-control" placeholder="Enter new symbol">
+                    </div>
+                </div>
+                <div class="form-check mb-3">
+                    <input type="checkbox" class="form-check-input" name="case_sensitive" id="case_sensitive">
+                    <label class="form-check-label" for="case_sensitive">Case Sensitive</label>
+                </div>
+                <div class="text-center">
+                    <button type="submit" class="btn btn-primary" name="action" value="replace_symbol">Replace Symbol</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-        <input type="checkbox" name="case_sensitive" id="case_sensitive">
-        <label for="case_sensitive">Case Sensitive</label>
-        <button type="submit" name="action" value="replace_symbol">Replace Symbol</button>
-      </form>
-        <br><br>
+    <!-- Form for Trimming and Cleaning Whitespace -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Trim and Clean Whitespace</h5>
+            <form method="post" action="{% url 'edit_data' %}">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="columns_to_trim" class="form-label">Select Columns:</label>
+                    <select name="columns_to_trim" id="columns_to_trim" multiple class="form-select">
+                        <option value="__all__">--ALL COLUMNS--</option>
+                        {% for column in df_v3.columns %}
+                        <option value="{{ column }}">{{ column }}</option>
+                        {% endfor %}
+                    </select>
+                    
+                </div>
+                <div class="text-center">
+                    <button type="submit" class="btn btn-primary" name="action" value="trim_and_replace_whitespaces">Trim and Clean Whitespace</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-        <div class="container mt-4">
-          <h2>Trim and Clean Whitespace</h2>
+    <!-- Form for Data Validation -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Validate Data</h5>
+            <form method="post" action="{% url 'edit_data' %}">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="columns_to_validate" class="form-label">Select Columns:</label>
+                    <select name="columns_to_validate" id="columns_to_validate" multiple class="form-select">
+                      <option value="__all__">--ALL COLUMNS--</option>
+                      {% for column in df_v3.columns %}
+                      <option value="{{ column }}">{{ column }}</option>
+                      {% endfor %}
+                  </select>
+              </div>
+              <div class="mb-3">
+                  <select name="validation_type" id="validation_type" class="form-select">
+                      <option value="letters">Only Letters</option>
+                      <option value="numbers">Only Numbers</option>
+                      <option value="no_specials">No Special Characters</option>
+                      <option value="regex">Match Regex</option>
+                  </select>
+              </div>
+              <div class="mb-3">
+                  <input type="text" name="regex_pattern" id="regex_pattern" class="form-control" placeholder="Regex, e.g. [a-zA-Z]+" style="display: none;">
+              </div>
+              <div class="form-check mb-3">
+                  <input type="checkbox" class="form-check-input" name="ignore_whitespace" id="ignore_whitespace" checked>
+                  <label class="form-check-label" for="ignore_whitespace">Ignore Whitespace</label>
+              </div>
+              <div class="text-center">
+                  <button type="submit" class="btn btn-primary" name="action" value="validate_data">Validate Data</button>
+              </div>
+          </form>
+      </div>
+  </div>
+
+  <!-- Form for Finding Duplicates -->
+  <div class="card mb-4">
+      <div class="card-body">
+          <h5 class="card-title">Find Duplicates</h5>
           <form method="post" action="{% url 'edit_data' %}">
               {% csrf_token %}
               <div class="mb-3">
-                  <label for="columns_to_trim" class="form-label">Select Columns:</label>
-                  <select name="columns_to_trim" id="columns_to_trim" multiple class="form-select">
+                  <label for="columns_to_check_duplicates" class="form-label">Select Columns:</label>
+                  <select name="columns_to_check_duplicates" id="columns_to_check_duplicates" multiple class="form-select">
                       <option value="__all__">--ALL COLUMNS--</option>
                       {% for column in df_v3.columns %}
-                          <option value="{{ column }}">{{ column }}</option>
+                      <option value="{{ column }}">{{ column }}</option>
                       {% endfor %}
                   </select>
-                  <small class="text-muted">Use CTRL to select multiple columns or select '--ALL COLUMNS--' to apply to all.</small>
               </div>
-              <button type="submit" name="action" value="trim_and_replace_whitespaces" class="btn btn-primary">Trim and Clean Whitespace</button>
+              <div class="text-center">
+                  <button type="submit" class="btn btn-primary" name="action" value="check_duplicates">Find Duplicates</button>
+              </div>
           </form>
       </div>
-      <br><br>
-
-    <form method="post" action="{% url 'edit_data' %}">
-      {% csrf_token %}
-<!-- Form for Data Validation -->
-<h2>Validate data</h2>
-    <select name="columns_to_validate" multiple class="column-selector">
-      <option value="__all__">--ALL COLUMNS--</option> <!-- Special value to indicate all columns -->
-      {% for column in df_v3.columns %}
-        <option value="{{ column }}">{{ column }}</option>
-      {% endfor %}
-    </select>
-    <select name="validation_type"  id="validation_type">
-      <option value="letters">Only Letters</option>
-      <option value="numbers">Only Numbers</option>
-      <option value="no_specials">No Special Characters</option>
-      <option value="regex">Match Regex</option>
-    </select>
-    <!-- Regex input field, initially hidden -->
-    <input type="text" name="regex_pattern" id="regex_pattern" placeholder="Regex, e.g. [a-zA-Z]+" style="display: none;">
-    <input type="checkbox" name="ignore_whitespace" id="ignore_whitespace" checked>
-    <label for="ignore_whitespace">Ignore Whitespace</label>
-    <button type="submit" name="action" value="validate_data">Validate Data</button>
-    </form>
-  <br><br>
-
-  <form method="post" action="{% url 'edit_data' %}">
-    {% csrf_token %}
-  <h2>Find Duplicates</h2>
-<select name="columns_to_check_duplicates" multiple class="column-selector">
-    <option value="__all__">--ALL COLUMNS--</option>
-    {% for column in df_v3.columns %}
-        <option value="{{ column }}">{{ column }}</option>
-    {% endfor %}
-</select>
-<button type="submit" name="action" value="check_duplicates">Find Duplicates</button>
-<br><br> 
-<script type="text/javascript">
-    var csrfToken = '{{ csrf_token }}';
-    var sessionKey = '{{ request.session.session_key }}';
-</script>
-<script src="{% static 'js/main.js' %}" type="text/javascript"></script>
-
-<button id="undo-button" class="btn btn-warning">Undo</button>
-
-      </form>
-      <br><br>
+  </div>
 
 
-    {% if showing_duplicates %}
-      <!-- Display duplicates with checkmarks -->
-      <form id="duplicatesForm" method="post" action="{% url 'edit_data' %}">
-          {% csrf_token %}
-          <div class="scrollable-table preserve-whitespace" id="duplicates-table">
-              <!-- JavaScript will populate this with duplicate rows -->
-          </div>
-          <button type="button" onclick="deleteSelected()">Delete Selected</button>
-          <button type="submit" name="action" value="show_all">Show All</button>
-      </form>
+
+
+  <div class="container-fluid px-0"> 
+    <div class="card m-0">
+        <div class="card-body p-0">  
+  {% if showing_duplicates %}
+  <!-- Display Duplicates with Checkmarks -->
+
+          <h5 class="card-title">Duplicate Rows</h5>
+          <form id="duplicatesForm" method="post" action="{% url 'edit_data' %}">
+              {% csrf_token %}
+              <div class="scrollable-table preserve-whitespace" id="duplicates-table">
+                  <!-- JavaScript will populate this with duplicate rows -->
+              </div>
+              <div class="text-center mt-3">
+                  <button type="button" class="btn btn-danger" onclick="deleteSelected()">Delete Selected</button>
+                  <button type="submit" class="btn btn-secondary" name="action" value="show_all">Show All</button>
+              </div>
+          </form>
+ 
   {% else %}
-      <div class="scrollable-table">
-          {{ table|safe }}
-      </div>
+  <div class="scrollable-table preserve-whitespace">{{ table|safe }}</div>
   {% endif %}
-</div>
 
+</div>
+</div>
+</div>
+</div>
 
 {% endblock content %}
 {% block scripts %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Check if showing duplicates
-        if ("{{ showing_duplicates }}") {
-            let duplicates = JSON.parse('{{ duplicates_json|escapejs }}');
-            renderDuplicates(duplicates);
-        }
-    });
+  document.addEventListener('DOMContentLoaded', function () {
+      // Check if showing duplicates
+      if ("{{ showing_duplicates }}") {
+          let duplicates = JSON.parse('{{ duplicates_json|escapejs }}');
+          renderDuplicates(duplicates);
+      }
+  });
 </script>
 {% endblock %}
+

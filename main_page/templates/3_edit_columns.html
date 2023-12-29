@@ -1,108 +1,204 @@
-{% extends "base.html" %} 
+{% extends "base.html" %}
 {% load static %}
 {% block content %}
 
-
-<br>
-    {% for message in messages %}
-    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+<div class="container">
+  <div class="row mb-4">
+    <div class="col-12">
+      {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
         {{ message }}
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+      {% endfor %}
     </div>
-{% endfor %}
+  </div>
+
+  <!-- Add Column Form -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Add New Column</h5>
+          <form method="post" action="{% url 'edit_columns' %}">
+            {% csrf_token %}
+            <div class="input-group mb-3">
+              <input type="text" name="new_column_name" class="form-control" placeholder="Enter new column header"
+                required>
+              <button class="btn btn-success" type="submit" name="action" value="add_column">Add</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Columns Form -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Delete Selected Columns</h5>
+          <form method="post" action="{% url 'edit_columns' %}">
+            {% csrf_token %}
+            <div class="mb-3">
+              <select name="columns_to_delete" multiple class="form-select">
+                {% for column in df_v2.columns %}
+                <option value="{{ column }}">{{ column }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="text-center">
+              <button type="submit" class="btn btn-danger" name="action" value="delete_columns">Delete</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Autofill Selected Columns Form -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Autofill Selected Column</h5>
+          <form method="post" action="{% url 'edit_columns' %}">
+            {% csrf_token %}
+            <div class="mb-3">
+              <label for="column_to_fill" class="form-label">Select Column to Autofill:</label>
+              <select name="column_to_fill" id="column_to_fill" class="form-select">
+                {% for column in df_v2.columns %}
+                <option value="{{ column }}">{{ column }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="mb-3">
+              <input type="text" name="fill_value" class="form-control" placeholder="Enter value to fill">
+            </div>
+            <div class="mb-3">
+              <select name="fill_option" class="form-select">
+                <option value="all">Fill All</option>
+                <option value="empty">Fill Empty</option>
+              </select>
+            </div>
+            <div class="text-center">
+              <button type="submit" class="btn btn-primary" name="action" value="fill_column">Fill Column</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Split Selected Column Form -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Split Selected Column</h5>
+          <form method="post" action="{% url 'edit_columns' %}">
+            {% csrf_token %}
+            <div class="mb-3">
+              <label for="column_to_split" class="form-label">Select Column to Split:</label>
+              <select name="column_to_split" id="column_to_split" class="form-select">
+                {% for column in df_v2.columns %}
+                <option value="{{ column }}">{{ column }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="mb-3">
+              <input type="text" name="split_value" class="form-control" placeholder="Enter character(s) to split on">
+            </div>
+            <div class="form-check mb-3">
+              <input type="checkbox" class="form-check-input" name="delete_original" id="delete_original">
+              <label class="form-check-label" for="delete_original">Delete Original Column After Split</label>
+            </div>
+            <div class="text-center">
+              <button type="submit" class="btn btn-primary" name="action" value="split_column">Split Column</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Merge Selected Columns Form -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Merge Selected Columns</h5>
+          <form method="post" action="{% url 'edit_columns' %}">
+            {% csrf_token %}
+            <div class="mb-3">
+              <label for="columns_to_merge" class="form-label">Select Columns to Merge:</label>
+              <select name="columns_to_merge" id="columns_to_merge" multiple class="form-select">
+                {% for column in df_v2.columns %}
+                <option value="{{ column }}">{{ column }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="mb-3">
+              <input type="text" name="merge_separator" class="form-control" placeholder="Enter Separator">
+            </div>
+            <div class="mb-3">
+              <input type="text" name="new_merge_column_name" class="form-control" placeholder="Enter New Column Name">
+            </div>
+            <div class="text-center">
+              <button type="submit" class="btn btn-primary" name="action" value="merge_columns">Merge Columns</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rename Selected Column Form -->
+  <div class="row mb-4">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Rename Selected Column</h5>
+          <form method="post" action="{% url 'edit_columns' %}">
+            {% csrf_token %}
+            <div class="mb-3">
+              <label for="column_to_rename" class="form-label">Select Column to Rename:</label>
+              <select name="column_to_rename" id="column_to_rename" class="form-select">
+                {% for column in df_v2.columns %}
+                <option value="{{ column }}">{{ column }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="mb-3">
+              <input type="text" name="new_renamed_column_name" class="form-control"
+                placeholder="Enter New Column Name">
+            </div>
+            <div class="text-center">
+              <button type="submit" class="btn btn-primary" name="action" value="rename_column">Rename Column</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- Undo Button -->
+  <div class="row">
+    <div class="col-12">
+      <button id="undo-button" class="btn btn-warning">Undo</button>
+    </div>
+  </div>
 <br>
-
-<form method="post" action="{% url 'edit_columns' %}">
-  {% csrf_token %}
-  <input type="text" name="new_column_name" placeholder="Enter new column header" required>
-  <button type="submit" name="action" value="add_column">Add Column</button>
-</form>
-<br><br>
-
-<form method="post" action="{% url 'edit_columns' %}">
-  {% csrf_token %}
-<h2>Delete Selected Columns</h2>
-  <select name="columns_to_delete" multiple class="column-selector">
-    {% for column in df_v2.columns %}
-      <option value="{{ column }}">{{ column }}</option>
-    {% endfor %}
-  </select>
-  <button type="submit" name="action" value="delete_columns">Delete Selected Columns</button>
-</form>
-<br><br>
-
-<form method="post" action="{% url 'edit_columns' %}">
-  {% csrf_token %}
-<h2>Autofill Selected Columns</h2>
-  <select name="column_to_fill" class="column-selector">
-    {% for column in df_v2.columns %}
-      <option value="{{ column }}">{{ column }}</option>
-    {% endfor %}
-  </select>
-  <input type="text" name="fill_value" placeholder="Enter value to fill">
-  <select name="fill_option">
-    <option value="all">Fill All</option>
-    <option value="empty">Fill Empty</option>
-  </select>
-  <button type="submit" name="action" value="fill_column">Fill Column</button>
-</form>
-<br><br>
-
-<form method="post" action="{% url 'edit_columns' %}">
-  {% csrf_token %}
-<h2>Split Selected Columns</h2>
-<select name="column_to_split" class="column-selector">
-  {% for column in df_v2.columns %}
-    <option value="{{ column }}">{{ column }}</option>
-  {% endfor %}
-</select>
-<input type="text" name="split_value" placeholder="Enter character(s) to split on">
-<input type="checkbox" name="delete_original" id="delete_original">
-<label for="delete_original">Delete original column after split</label>
-<button type="submit" name="action" value="split_column">Split Column</button>
-</form>
-<br><br>
-
-<form method="post" action="{% url 'edit_columns' %}">
-  {% csrf_token %}
-<h2>Merge Selected Columns</h2>
-<label>Select columns to merge (in order):</label>
-<select name="columns_to_merge" multiple class="column-selector">
-  {% for column in df_v2.columns %}
-    <option value="{{ column }}">{{ column }}</option>
-  {% endfor %}
-</select>
-<input type="text" name="merge_separator" placeholder="Enter separator">
-<input type="text" name="new_merge_column_name" placeholder="Enter new column name">
-<button type="submit" name="action" value="merge_columns">Merge Columns</button>
-</form>
-<br><br>
-
-<form method="post" action="{% url 'edit_columns' %}">
-  {% csrf_token %}
-<h2>Rename Selected Columns</h2>
-<select name="column_to_rename" class="column-selector">
-  {% for column in df_v2.columns %}
-    <option value="{{ column }}">{{ column }}</option>
-  {% endfor %}
-</select>
-<input type="text" name="new_renamed_column_name" placeholder="Enter new column name">
-<button type="submit" name="action" value="rename_column">Rename Column</button>
-
-<br><br> 
-<script type="text/javascript">
-    var csrfToken = '{{ csrf_token }}';
-    var sessionKey = '{{ request.session.session_key }}';
-</script>
-<script src="{% static 'js/main.js' %}" type="text/javascript"></script>
-
-<button id="undo-button" class="btn btn-warning">Undo</button>
-</form>
-
-<br><br>
-<div class="container">
-  <div class="scrollable-table preserve-whitespace">
-      {{ table|safe }}
+<!-- Data Table Display -->
+<div class="container-fluid px-0"> 
+  <div class="card m-0">
+      <div class="card-body p-0">
+          <div class="scrollable-table preserve-whitespace">{{ table|safe }}</div>
+      </div>
   </div>
 </div>
+
+
 {% endblock content %}

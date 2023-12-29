@@ -5,202 +5,202 @@
 {% block content %}
 
 
-<div class="row">
-    <div class="col-sm-6 mb-3 mb-sm-0">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">File Details</h5>
-                <p class="card-text">Number of Columns: {{ num_cols }}</p>
-                <div class="dropdown">
-                    <button class="btn btn-secondary dropdown-toggle" type="button" id="columnDropdown"
-                        data-bs-toggle="dropdown" aria-expanded="false">
-                        Column Names
-                    </button>
-                    <ul div class="dropdown-menu">
-                        {% for name in col_names %}
-                        <li><a class="dropdown-item">{{ name|slice:":50" }}{% if name|length > 50 %}...{% endif %}</a>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6">
-        <div class="card">
-            <div class="card-body">
-                <h5 class="card-title">Row Information</h5>
-                <p class="card-text">Number of Rows: {{ num_rows }}</p>
-            </div>
-        </div>
-    </div>
-    <div>
-
-        <br>
-        {% for message in messages %}
-        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-        {% endfor %}
-        <br>
-
-        <form id="deleteRowsForm" action="{% url 'summary' %}" method="post">
-            {% csrf_token %}
-            <label for="num_rows_to_delete_start">Delete first </label>
-            <input type="number" name="num_rows_to_delete_start" id="num_rows_to_delete_start" min="0">
-            <label for="num_rows_to_delete_start"> rows</label><br>
-
-            <input type="checkbox" name="replace_header" id="replace_header">
-            <label for="replace_header">Delete header too</label><br>
-
-            <label for="num_rows_to_delete_end">Delete last </label>
-            <input type="number" name="num_rows_to_delete_end" id="num_rows_to_delete_end" min="1">
-            <label for="num_rows_to_delete_end"> rows</label><br>
-
-            <button type="submit">Delete Rows</button>
-        </form>
-        <br> <br>
-        <form id="removeEmptyForm" action="{% url 'summary' %}" method="post">
-            {% csrf_token %}
-
-            {% if num_empty_rows > 0 %}
-            <label for="removeRowsCheckbox">There are {{ num_empty_rows }} empty rows. Delete them? </label>
-            <input type="checkbox" name="remove_empty_rows" id="removeRowsCheckbox">
-            <br><br>{% endif %}
-
-            {% if empty_cols %}
-
-            <label>There are {{ num_empty_cols }} empty columns. Select to delete: </label><br>
-            {% for col in empty_cols %}
-            <input type="checkbox" name="remove_empty_cols" value="{{ col }}"> {{ col }}<br>
-            {% endfor %}
-
-            <br>{% endif %}
-            {% if num_empty_cols > 0 or num_empty_rows > 0 %}
-            <button type="submit">Submit</button>
-            {% endif %}
-            <br><br>
-
-
-
-            <script type="text/javascript">
-                var csrfToken = '{{ csrf_token }}';
-                var sessionKey = '{{ request.session.session_key }}';
-            </script>
-            
-
-            <button id="undo-button" class="btn btn-warning">Undo</button>
-
-        </form>
-        <br><br>
-        <form action="{% url 'summary' %}" method="post">
-            {% csrf_token %}
-            <label for="template_id">Choose a template to apply:</label>
-            <select name="template_id" id="template_id">
-                {% for template in templates %}
-                <option value="{{ template.id }}">{{ template.name }}</option>
-                {% empty %}
-                <option>No templates available</option>
-                {% endfor %}
-            </select>
-            <button type="submit" name="apply_template">Apply Template</button>
-        </form>
-        <br><br>
-        {% if header_mismatch %}
-        <div>
-            <h4 class="alert alert-danger">Header Mismatch Detected</h4>
-            <p><strong>Current Headers:</strong> 
-                {% for header, is_mismatched in mismatched_headers_marked.0 %}
-                    {% if is_mismatched %}<ins>{{ header }}</ins>{% else %}{{ header }}{% endif %}
-                    {% if not forloop.last %}, {% endif %}
-                {% endfor %}
-            </p>
-            <p><strong>Template Headers: </strong>
-                {% for header, is_mismatched in mismatched_headers_marked.1 %}
-                    {% if is_mismatched %}<ins>{{ header }}</ins>{% else %}{{ header }}{% endif %}
-                    {% if not forloop.last %}, {% endif %}
-                {% endfor %}
-            </p>
-        
-            <div class="row">
-                <div class="col-12">
-                    <div class="card">
-                        <div class="card-body">
-                            <h5 class="card-title text-center mb-4">Add and Delete Columns</h5>
-                            <form action="{% url 'summary' %}" method="post">
-                                {% csrf_token %}
-                                <input type="hidden" name="adjust_columns" value="1">
-            
-                                <div class="row">
-                                    <!-- Dynamic field for adding new columns -->
-                                    <div class="col-md-6 mb-3">
-                                        <label class="form-label">Add Column:</label>
-                                        <div id="newColumnsContainer">
-                                            <input type="text" class="form-control mb-2" name="new_column[]" placeholder="New Column Name">
-                                        </div>
-                                        <button type="button" id="addNewColumnBtn" class="btn btn-secondary">Add Another Column</button>
-                                    </div>
-            
-                                    <!-- Multiple select dropdown for deleting columns -->
-                                    <div class="col-md-6 mb-3">
-                                        <label for="deleteColumnsSelect" class="form-label">Select Columns to Delete:</label>
-                                        <select name="delete_columns[]" id="deleteColumnsSelect" multiple class="form-control">
-                                            {% for col in col_names %}
-                                                <option value="{{ col }}">{{ col }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                </div>
-            
-                                <div class="mt-4 text-center">
-                                    <button type="submit" class="btn btn-primary">Update Columns</button>
-                                </div>
-                            </form>
-                        </div>
+<div class="container-fluid px-0">
+    <div class="container py-4">
+    <div class="row mb-4">
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">File Details</h5>
+                    <p class="card-text">Number of Columns: {{ num_cols }}</p>
+                    <div class="dropdown">
+                        <button class="btn btn-secondary dropdown-toggle" type="button" id="columnDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            Column Names
+                        </button>
+                        <ul class="dropdown-menu">
+                            {% for name in col_names %}
+                            <li><a class="dropdown-item">{{ name|slice:":50" }}{% if name|length > 50 %}...{% endif %}</a></li>
+                            {% endfor %}
+                        </ul>
                     </div>
                 </div>
             </div>
-            
-            <br><br>
-<!-- Form to map headers -->
-<form action="{% url 'summary' %}" method="post" class="mt-4">
-    {% csrf_token %}
-
-    <!-- Hidden field to indicate map_headers action -->
-    <input type="hidden" name="map_headers" value="1">
-
-    <!-- Dynamically generate inputs for mapping each header -->
-    {% for header in mismatched_headers.0 %}
-    <div class="mb-3 row">
-        <label for="header-{{ header }}" class="col-sm-4 col-form-label">
-            Map "{{ header }}" to:
-        </label>
-        <div class="col-sm-8">
-            <select name="header-{{ header }}" id="header-{{ header }}" class="form-select">
-                <option disabled selected value> -- select an option -- </option>
-                {% for template_header in mismatched_headers.1 %}
-                    <option value="{{ template_header }}">{{ template_header }}</option>
-                {% endfor %}
-            </select>
+        </div>
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Row Information</h5>
+                    <p class="card-text">Number of Rows: {{ num_rows }}</p>
+                </div>
+            </div>
         </div>
     </div>
-{% endfor %}
 
-    <div class="text-center">
-        <button type="submit" class="btn btn-primary">Map Headers</button>
+    <!-- Alert Messages -->
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
     </div>
-</form>
+    {% endfor %}
 
-        
-        </div><br><br>
-        {% endif %}
-        
+    <!-- Row Deletion and Header Replacement Form -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form action="{% url 'summary' %}" method="post">
+                {% csrf_token %}
+                <h5 class="card-title">Modify Rows</h5>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label for="num_rows_to_delete_start" class="form-label">Delete first</label>
+                        <input type="number" class="form-control" name="num_rows_to_delete_start" id="num_rows_to_delete_start" min="0" placeholder="Number of rows">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="num_rows_to_delete_end" class="form-label">Delete last</label>
+                        <input type="number" class="form-control" name="num_rows_to_delete_end" id="num_rows_to_delete_end" min="0" placeholder="Number of rows">
+                    </div>
+                </div>
+                <div class="form-check mb-3">
+                    <input type="checkbox" class="form-check-input" name="replace_header" id="replace_header">
+                    <label class="form-check-label" for="replace_header">Replace header</label>
+                </div>
+                <div class="text-center">
+                    <button type="submit" class="btn btn-danger" name="action" value="delete_rows">Delete Rows</button>
+                </div>
+            </form>
+        </div>
+    </div>
+<!-- Empty Rows and Columns Removal Form -->
+{% if num_empty_rows > 0 or empty_cols %}
+<div class="card mb-4">
+    <div class="card-body">
+        <form id="removeEmptyForm" action="{% url 'summary' %}" method="post">
+            {% csrf_token %}
+            <h5 class="card-title">Remove Empty Rows and Columns</h5>
+            {% if num_empty_rows > 0 %}
+            <div class="form-check mb-3">
+                <input type="checkbox" class="form-check-input" name="remove_empty_rows" id="removeRowsCheckbox">
+                <label class="form-check-label" for="removeRowsCheckbox">Delete {{ num_empty_rows }} empty rows</label>
+            </div>
+            {% endif %}
+            {% if empty_cols %}
+            <div class="mb-3">
+                <label class="form-label">Select empty columns to delete:</label>
+                {% for col in empty_cols %}
+                <div class="form-check">
+                    <input type="checkbox" class="form-check-input" name="remove_empty_cols" value="{{ col }}" id="emptyCol{{ forloop.counter }}">
+                    <label class="form-check-label" for="emptyCol{{ forloop.counter }}">{{ col }}</label>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            <div class="text-center">
+                <button type="submit" class="btn btn-danger">Delete Selected</button>
+            </div>
+        </form>
     </div>
 </div>
-<div class="container">
-    <div class="scrollable-table preserve-whitespace" id="summary-table">
-        {{ table|safe }}
+{% endif %}
+
+<!-- Template Application Form -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form action="{% url 'summary' %}" method="post">
+            {% csrf_token %}
+            <h5 class="card-title">Apply Template</h5>
+            <div class="mb-3">
+                <label for="template_id" class="form-label">Choose a template:</label>
+                <select name="template_id" id="template_id" class="form-select">
+                    {% for template in templates %}
+                    <option value="{{ template.id }}">{{ template.name }}</option>
+                    {% empty %}
+                    <option disabled>No templates available</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="text-center">
+                <button type="submit" name="apply_template" class="btn btn-success">Apply Template</button>
+            </div>
+        </form>
     </div>
 </div>
+
+{% if header_mismatch %}
+<!-- Header Mismatch Notification -->
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title text-danger">Header Mismatch Detected</h5>
+        <p><strong>Current Headers:</strong> {% for header, is_mismatched in mismatched_headers_marked.0 %}{% if is_mismatched %}<ins>{{ header }}</ins>{% else %}{{ header }}{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+        <p><strong>Template Headers:</strong> {% for header, is_mismatched in mismatched_headers_marked.1 %}{% if is_mismatched %}<ins>{{ header }}</ins>{% else %}{{ header }}{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+        
+        <!-- Add and Delete Columns Form -->
+        <form action="{% url 'summary' %}" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="adjust_columns" value="1">
+            <div class="row">
+                <!-- Dynamic field for adding new columns -->
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Add Column:</label>
+                    <div id="newColumnsContainer">
+                        <input type="text" class="form-control mb-2" name="new_column[]" placeholder="New Column Name">
+                    </div>
+                    <button type="button" id="addNewColumnBtn" class="btn btn-secondary">Add Another Column</button>
+                </div>
+
+                <!-- Multiple select dropdown for deleting columns -->
+                <div class="col-md-6 mb-3">
+                    <label for="deleteColumnsSelect" class="form-label">Select Columns to Delete:</label>
+                    <select name="delete_columns[]" id="deleteColumnsSelect" multiple class="form-control">
+                        {% for col in col_names %}
+                        <option value="{{ col }}">{{ col }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="text-center mt-4">
+                <button type="submit" class="btn btn-primary">Update Columns</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Form to Map Headers -->
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Map Headers</h5>
+        <form action="{% url 'summary' %}" method="post">
+            {% csrf_token %}
+            <input type="hidden" name="map_headers" value="1">
+            {% for header in mismatched_headers.0 %}
+            <div class="mb-3 row">
+                <label for="header-{{ header }}" class="col-sm-4 col-form-label">Map "{{ header }}" to:</label>
+                <div class="col-sm-8">
+                    <select name="header-{{ header }}" id="header-{{ header }}" class="form-select">
+                        <option disabled selected value> -- select an option -- </option>
+                        {% for template_header in mismatched_headers.1 %}
+                        <option value="{{ template_header }}">{{ template_header }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            {% endfor %}
+            <div class="text-center">
+                <button type="submit" class="btn btn-primary">Map Headers</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+</div>
+
+<!-- Data Table Display -->
+<div class="container-fluid px-0"> 
+    <div class="card m-0">
+        <div class="card-body p-0">
+            <div class="scrollable-table preserve-whitespace">{{ table|safe }}</div>
+        </div>
+    </div>
+</div>
+
+
 {% endblock content %}

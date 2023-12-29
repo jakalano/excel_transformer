@@ -1,38 +1,43 @@
 {% extends 'base.html' %}
 
 {% block content %}
-    <h2>User Profile</h2>
-    <p><strong>Username:</strong> {{ user.username }}</p>
-    <p><strong>Email:</strong> {{ user.email }}</p>
-    <p><strong>Date Joined:</strong> {{ date_joined|date:"F d, Y" }}</p> <!-- Format the date -->
-    <p><strong>Last Login:</strong> {{ last_login|date:"F d, Y H:i" }}</p> <!-- Format the date and time -->
+    <div class="container mt-4">
+        <h2>User Profile</h2>
+        <div class="card mb-3">
+            <div class="card-body">
+                <p><strong>Username:</strong> {{ user.username }}</p>
+                <p><strong>Email:</strong> {{ user.email }}</p>
+                <p><strong>Date Joined:</strong> {{ date_joined|date:"F d, Y" }}</p> <!-- Format the date -->
+                <p><strong>Last Login:</strong> {{ last_login|date:"F d, Y H:i" }}</p> <!-- Format the date and time -->
+            </div>
+        </div>
 
-    <h3>My Templates</h3>
-    <div class="accordion" id="templateAccordion">
-        {% for template in templates %}
-            <div class="accordion-item">
-                <h2 class="accordion-header" id="heading{{ template.id }}">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ template.id }}" aria-expanded="false" aria-controls="collapse{{ template.id }}">
-                        {{ template.name }}
-                    </button>
-                </h2>
-                <div id="collapse{{ template.id }}" class="accordion-collapse collapse" aria-labelledby="heading{{ template.id }}" data-bs-parent="#templateAccordion">
-                    <div class="accordion-body">
-                        <strong>Actions:</strong>
-                        <ol>
-                            {% for action in template.actions %}
-                                <li>
-                                    <strong>Type:</strong> {{ action.action_type }}
-                                    <strong>Parameters:</strong> {{ action.parameters }}
-                                    
-                                </li>
-                            {% endfor %}
-                        </ol>
+        <h3>My Templates</h3>
+        <div class="accordion" id="templateAccordion">
+            {% for template in templates %}
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="heading{{ template.id }}">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ template.id }}" aria-expanded="false" aria-controls="collapse{{ template.id }}">
+                            {{ template.name }}
+                        </button>
+                    </h2>
+                    <div id="collapse{{ template.id }}" class="accordion-collapse collapse" aria-labelledby="heading{{ template.id }}" data-bs-parent="#templateAccordion">
+                        <div class="accordion-body">
+                            <strong>Actions:</strong>
+                            <ol class="list-group list-group-numbered">
+                                {% for action in template.actions %}
+                                    <li class="list-group-item">
+                                        <strong>Type:</strong> {{ action.action_type }}
+                                        <strong>Parameters:</strong> {{ action.parameters }}
+                                    </li>
+                                {% endfor %}
+                            </ol>
+                        </div>
                     </div>
                 </div>
-            </div>
-        {% empty %}
-            <p>No templates saved.</p>
-        {% endfor %}
+            {% empty %}
+                <p>No templates saved.</p>
+            {% endfor %}
+        </div>
     </div>
 {% endblock %}

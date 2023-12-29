@@ -9,7 +9,7 @@ from django.template import loader
 from django.conf import settings
 from .utils import (
     load_dataframe_from_file, save_dataframe,
-    dataframe_to_html, remove_empty_rows,record_action, 
+    dataframe_to_html, record_action, 
     get_actions_for_session, save_as_template, action_to_dict,
     handle_remove_empty_rows, handle_remove_empty_cols,
     handle_delete_first_x_rows, handle_delete_last_x_rows,
@@ -342,10 +342,12 @@ def summary(request):
     if request.method == 'POST':
         # deletes all empty rows
         if 'remove_empty_rows' in request.POST:
-            df_v1, rows_removed = handle_remove_empty_rows(df_v1)
+            try:
+                df_v1, rows_removed = handle_remove_empty_rows(df_v1)
 
-            messages.success(request, f'{rows_removed} empty rows removed.')
-
+                messages.success(request, f'{rows_removed} empty rows removed.')
+            except ValueError as e:
+                messages.error(request, str(e))
             record_action(
                 uploaded_file=uploaded_file_instance,        
                 action_type='remove_empty_rows',
@@ -356,11 +358,14 @@ def summary(request):
            
         # deletes selected columns
         elif 'remove_empty_cols' in request.POST:
-            cols_to_delete = request.POST.getlist('remove_empty_cols')
-            df_v1, cols_removed = handle_remove_empty_cols(df_v1, cols_to_delete)
+            try:
+                cols_to_delete = request.POST.getlist('remove_empty_cols')
+                df_v1, cols_removed = handle_remove_empty_cols(df_v1, cols_to_delete)
 
 
-            messages.success(request, f'{cols_removed} empty columns removed.')
+                messages.success(request, f'{cols_removed} empty columns removed.')
+            except ValueError as e:
+                messages.error(request, str(e))
             record_action(        
                     uploaded_file=uploaded_file_instance,
                     action_type='remove_empty_cols',
@@ -369,52 +374,54 @@ def summary(request):
                     session_id=request.session.session_key,
                     )
 
-        num_rows_to_delete_start = request.POST.get('num_rows_to_delete_start')
-        replace_header = 'replace_header' in request.POST
-        num_rows_to_delete_end = request.POST.get('num_rows_to_delete_end')
+        if 'num_rows_to_delete_start' in request.POST:
+            try:
+                num_rows_to_delete_start = int(request.POST.get('num_rows_to_delete_start', 0))
+                df_v1, _ = handle_delete_first_x_rows(df_v1, num_rows_to_delete_start)
+                messages.success(request, f'First {num_rows_to_delete_start} rows deleted successfully.')
 
-        # check if num_rows_to_delete_start is not None and convert to int, else default to 0
-        num_rows_to_delete_start = int(num_rows_to_delete_start) if num_rows_to_delete_start else 0
-        
-
-        # deletes the first X rows
-        if num_rows_to_delete_start > 0:
-            df_v1 = handle_delete_first_x_rows(df_v1, num_rows_to_delete_start)
-            messages.success(request, f'First {num_rows_to_delete_start} deleted successfully.')
-            record_action(        
-                    uploaded_file=uploaded_file_instance,
-                    action_type='delete_first_X_rows',
-                    parameters={'num_rows_to_delete_start': num_rows_to_delete_start},
-                    user=request.user,
-                    session_id=request.session.session_key,
-                    )
+                record_action(        
+                        uploaded_file=uploaded_file_instance,
+                        action_type='delete_first_X_rows',
+                        parameters={'num_rows_to_delete_start': num_rows_to_delete_start},
+                        user=request.user,
+                        session_id=request.session.session_key,
+                        )
+            except ValueError as e:
+                messages.error(request, str(e))
         
         # if replace_header is True, set the df columns to the first row's values
-        if replace_header:
-            df_v1 = handle_replace_header_with_first_row(df_v1)
-            record_action(        
-                    uploaded_file=uploaded_file_instance,
-                    action_type='replace_header',
-                    parameters={},
-                    user=request.user,
-                    session_id=request.session.session_key,
-                    )
+        if 'replace_header' in request.POST:
+            try:
+                df_v1, _ = handle_replace_header_with_first_row(df_v1)
+                messages.success(request, 'Header replaced with the first row successfully.')
 
-        # checks if num_rows_to_delete_end is not None and convert to int, else default to 0
-        num_rows_to_delete_end = int(num_rows_to_delete_end) if num_rows_to_delete_end else 0
-        
-        # deletes the last X rows
-        if num_rows_to_delete_end > 0:
-            df_v1 = handle_delete_last_x_rows(df_v1, num_rows_to_delete_end)
-            messages.success(request, f'Last {num_rows_to_delete_end} deleted successfully.')
-            record_action(        
-                    uploaded_file=uploaded_file_instance,
-                    action_type='delete_last_X_rows',
-                    parameters={'num_rows_to_delete_end': num_rows_to_delete_end},
-                    user=request.user,
-                    session_id=request.session.session_key,
-                    )
+                record_action(        
+                        uploaded_file=uploaded_file_instance,
+                        action_type='replace_header',
+                        parameters={},
+                        user=request.user,
+                        session_id=request.session.session_key,
+                        )
+            except ValueError as e:
+                messages.error(request, str(e))
 
+# Handle deletion of the last X rows
+        if 'num_rows_to_delete_end' in request.POST:
+            try:
+                num_rows_to_delete_end = int(request.POST.get('num_rows_to_delete_end', 0))
+                df_v1, _ = handle_delete_last_x_rows(df_v1, num_rows_to_delete_end)
+                messages.success(request, f'Last {num_rows_to_delete_end} rows deleted successfully.')
+
+                record_action(        
+                        uploaded_file=uploaded_file_instance,
+                        action_type='delete_last_X_rows',
+                        parameters={'num_rows_to_delete_end': num_rows_to_delete_end},
+                        user=request.user,
+                        session_id=request.session.session_key,
+                        )
+            except ValueError as e:
+                messages.error(request, str(e))
         
         elif 'apply_template' in request.POST:
             template_id = request.POST.get('template_id')

@@ -23,21 +23,14 @@
     <title>Excel failu pārveidotājs</title>
   </head>
   <body>
-    <nav class="navbar sticky-top navbar-expand bg-body-tertiary">
-      <div class="container-fluid">
-        <a class="navbar-brand" href="/">Excel failu pārveidotājs</a>
-        <button
-          class="navbar-toggler"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#navbarNavDropdown"
-          aria-controls="navbarNavDropdown"
-          aria-expanded="false"
-          aria-label="Toggle navigation"
-        >
-          <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarNavDropdown">
+  <!-- Navigation Bar -->
+  <nav class="navbar navbar-expand-lg navbar-light bg-light sticky-top">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="/">Excel failu pārveidotājs</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNavDropdown" aria-controls="navbarNavDropdown" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNavDropdown">
           <ul class="navbar-nav me-auto mb-2 mb-lg-0">
             <li class="nav-item">
               <a class="nav-link {% if active_page == 'home' %}active{% endif %}" aria-current="page" href="/"
@@ -92,34 +85,29 @@
         </div>
       </div>
     </nav>
-    <div
-      class="d-flex flex-column justify-content-between"
-      style="height: 90vh"
-    >
+    <div class="d-flex flex-column justify-content-between" style="height: 90vh">
+      <!-- Main Content Container -->
       <div class="container-fluid mt-5 flex-grow-1">
-        <div class="p-4 border border-gray rounded stretch-to-bottom">
-          
-<h1>{{original_file_name}}</h1>
-          <!--<h1>Hello, world!</h1>-->
+        <div class="p-4 border border-gray rounded">
+          <h1 class="text-center">{{ original_file_name }}</h1>
           {% block content %}{% endblock %}
         </div>
       </div>
-          <nav aria-label="Main navigation" class="mt-auto">
-            <ul class="pagination justify-content-center">
-              <li class="page-item  {% if previous_page_url == None %}disabled{% endif %}">
-                <a class="page-link" href="{% if previous_page_url != None %}{% url previous_page_url %}{% endif %}">Iepriekšējā sadaļa</a>
-              </li>
-
-              <li class="page-item {% if next_page_url == None %}disabled{% endif %}">
-                <!-- This button submits the form -->
-                <a type="submit" class="page-link" href="{% if next_page_url != None %}{% url next_page_url %}{% endif %}">Nākamā sadaļa</a>
-              </li>
-            </ul>
-          </nav>
-</form>
-
-        
+    
+      <!-- Pagination Navigation -->
+      <nav aria-label="Main navigation" class="mt-auto">
+        <ul class="pagination justify-content-center">
+          <li class="page-item {% if previous_page_url == None %}disabled{% endif %}">
+            <a class="page-link" href="{% if previous_page_url != None %}{% url previous_page_url %}{% endif %}">Iepriekšējā sadaļa</a>
+          </li>
+          <li class="page-item {% if next_page_url == None %}disabled{% endif %}">
+            <a class="page-link" href="{% if next_page_url != None %}{% url next_page_url %}{% endif %}">Nākamā sadaļa</a>
+          </li>
+        </ul>
+      </nav>
     </div>
+    
+    
     <!-- Optional JavaScript -->
     <!-- jQuery first, then Popper.js, then Bootstrap JS -->
     <script

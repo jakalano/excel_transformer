@@ -1,37 +1,51 @@
-{% extends "base.html" %} {% block content %}
-<div class="container">
-  <br>
+{% extends "base.html" %} 
+{% block content %}
+
+<div class="container mt-4">
   {% for message in messages %}
   <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
       {{ message }}
       <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
   </div>
-{% endfor %}
-<br>
-  <form action="{% url 'download' %}" method="get">
-    <!-- <label for="enforce_utf8">Enforce UTF-8 Encoding:</label>
-    <input type="checkbox" id="enforce_utf8" name="enforce_utf8" checked>
-    <br><br> -->
-    <label for="format">Choose a format:</label>
-    <select name="format" id="format">
-        <option value="csv">CSV</option>
-        <option value="xlsx">XLSX</option>
-        <option value="json">JSON</option>
-        <option value="xml">XML</option>
-    </select><br><br>
-    <input type="submit" value="Download">
-</form>
-<!-- Template Saving Form -->
-<div class="container">
-  <h3>Save Your Actions as a Template</h3>
-  <form action="{% url 'save_template' %}" method="post">
-      {% csrf_token %}
-      <label for="templateName">Template Name:</label>
-      <input type="text" id="template_name" name="template_name" required>
-      <input type="submit" value="Save Template">
-  </form>
-</div>
+  {% endfor %}
 
+  <!-- Download Form -->
+  <div class="card mb-4">
+    <div class="card-body">
+      <h5 class="card-title">Download File</h5>
+      <form action="{% url 'download' %}" method="get" class="mt-3">
+        <div class="mb-3">
+          <label for="format" class="form-label">Choose a format:</label>
+          <select name="format" id="format" class="form-select">
+              <option value="csv">CSV</option>
+              <option value="xlsx">XLSX</option>
+              <option value="json">JSON</option>
+              <option value="xml">XML</option>
+          </select>
+        </div>
+        <div class="text-center">
+          <button type="submit" class="btn btn-primary">Download</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Template Saving Form -->
+  <div class="card">
+    <div class="card-body">
+      <h5 class="card-title">Save Your Actions as a Template</h5>
+      <form action="{% url 'save_template' %}" method="post" class="mt-3">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label for="template_name" class="form-label">Template Name:</label>
+            <input type="text" id="template_name" name="template_name" class="form-control" required>
+          </div>
+          <div class="text-center">
+            <button type="submit" class="btn btn-success">Save Template</button>
+          </div>
+      </form>
+    </div>
+  </div>
 </div>
 
 {% endblock content %}
