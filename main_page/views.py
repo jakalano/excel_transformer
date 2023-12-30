@@ -216,7 +216,8 @@ def apply_action(df, action_type, parameters, is_undo=False):
                     delimiter = parameters.get('delimiter')
                     delete_option = parameters.get('delete_option')
                     include_delimiter = parameters.get('include_delimiter')
-                    df = delete_data(df, columns_to_modify, delimiter, delete_option, include_delimiter)
+                    case_sensitive = parameters.get('case_sensitive')
+                    df = delete_data(df, columns_to_modify, delimiter, delete_option, include_delimiter, case_sensitive)
                 
 
             elif action_type == 'replace_symbol':
@@ -755,12 +756,13 @@ def edit_data(request):
             delete_option = request.POST.get('delete_option')
             include_delimiter = 'include_delimiter' in request.POST
             apply_to_all = '__all__' in columns_to_modify
+            case_sensitive = 'case_sensitive' in request.POST
 
             if apply_to_all:
                 columns_to_modify = df_v3.columns.tolist()  # lists all columns if '--ALL COLUMNS--' is selected
 
             try:
-                df_v3 = delete_data(df_v3, columns_to_modify, delimiter, delete_option, include_delimiter)
+                df_v3 = delete_data(df_v3, columns_to_modify, delimiter, delete_option, include_delimiter, case_sensitive)
                 messages.success(request, 'Data deleted successfully based on your criteria.')
             except ValueError as e:
                 messages.error(request, str(e))
@@ -771,7 +773,9 @@ def edit_data(request):
                 parameters={
                     'columns_to_modify': columns_to_modify,
                     'delimiter': delimiter,
-                    'delete_option': delete_option
+                    'delete_option': delete_option,
+                    'include_delimiter': include_delimiter,
+                    'case_sensitive': case_sensitive
                 },
                 user=request.user,
                 session_id=request.session.session_key,

@@ -218,30 +218,33 @@ def rename_column(df, column_to_rename, new_column_name):
 
 ################## edit_data view actions ###################
 
-def delete_data(df, columns_to_modify, delimiter, delete_option, include_delimiter):
+def delete_data(df, columns_to_modify, delimiter, delete_option, include_delimiter, case_sensitive=False):
     for column in columns_to_modify:
         if column in df.columns:
-            # converts entire column to strings, replacing NaN with empty strings
             column_series = df[column].fillna('').astype(str)
             try:
-                # print(f"Before operation: {column_series.head()}")
-                if include_delimiter:
-                    # if the user wants to delete the delimiter along with the data
-                    if delete_option == 'before':
-                        df[column] = column_series.apply(lambda x: x.split(delimiter)[-1] if delimiter in x else x)
-                    elif delete_option == 'after':
-                        df[column] = column_series.apply(lambda x: x.split(delimiter)[0] if delimiter in x else x)
+                if case_sensitive:
+                    # Case Sensitive: Use the provided delimiter as is
+                    pattern = re.escape(delimiter)
                 else:
-                    # if the user wants to keep the delimiter
+                    # Case Insensitive: Use re.IGNORECASE flag
+                    pattern = '(?i)' + re.escape(delimiter)
+
+                if include_delimiter:
                     if delete_option == 'before':
-                        df[column] = column_series.apply(lambda x: x.split(delimiter, 1)[-1] if delimiter in x else x)
+                        df[column] = column_series.apply(lambda x: re.split(pattern, x)[-1] if re.search(pattern, x) else x)
                     elif delete_option == 'after':
-                        # appends the delimiter after the operation if it's not to be deleted
-                        df[column] = column_series.apply(lambda x: delimiter + x.split(delimiter, 1)[-1] if delimiter in x else x)
-                        # print(f"After operation: {df_v3[column].head()}")
+                        df[column] = column_series.apply(lambda x: re.split(pattern, x)[0] if re.search(pattern, x) else x)
+                else:
+                    if delete_option == 'before':
+                        df[column] = column_series.apply(lambda x: re.split(pattern, x, 1)[-1] if re.search(pattern, x) else x)
+                    elif delete_option == 'after':
+                        df[column] = column_series.apply(lambda x: delimiter + re.split(pattern, x, 1)[-1] if re.search(pattern, x) else x)
             except Exception as e:
                 raise ValueError(f"Error processing column {column}: {e}")
     return df
+
+
 
 def replace_symbol(df, columns_to_replace, old_symbol, new_symbol, case_sensitive):
     for column in columns_to_replace:
