@@ -10,14 +10,52 @@
           <small class="text-muted">Choose .xlsx, .xls, .csv, .json file.</small>
           <form method="post" enctype="multipart/form-data" action="{% url 'main_page' %}" class="mt-3">
             {% csrf_token %}
+            {% if not multiple_sheets and not merged_cells %}
             <div class="mb-3">
-              
               {{ form.as_p }}
             </div>
+            
             <div class="text-center">
-              <button type="submit" class="btn btn-primary">Upload</button>
+              <button type="submit" name="file_upload" class="btn btn-primary">Upload</button>
             </div>
+            {% endif %}
           </form>
+          
+          {% if multiple_sheets %}
+            <form method="post" action="{% url 'main_page' %}" class="mt-3">
+              {% csrf_token %}
+              <div class="mb-3">
+                <label for="sheetSelect">Select a sheet:</label>
+                <select class="form-select" id="sheetSelect" name="sheet">
+                  <option value="__append_all__">--Join all sheets into one--</option>
+                  {% for sheet in sheet_names %}
+                    <option value="{{ sheet }}">{{ sheet }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+
+              <div class="text-center">
+                <button type="submit" name="sheet_selection" class="btn btn-primary">Process Sheet</button>
+              </div>
+            </form>
+          {% endif %}
+          {% if merged_cells %}
+  <form method="post" action="{% url 'main_page' %}" class="mt-3">
+    {% csrf_token %}
+    <div class="mb-3">
+      <label for="mergedCellAction">Merged Cells Found: Choose an Action</label>
+      <select class="form-select" id="mergedCellAction" name="merged_cell_action">
+        <option value="first_cell">Place in first unmerged cell</option>
+        <option value="all_cells">Place in all unmerged cells</option>
+        <option value="delete_rows">Delete rows with merged cells</option>
+      </select>
+    </div>
+    <div class="text-center">
+      <button type="submit" name="merged_cell_action_submit" class="btn btn-primary">Process Merged Cells</button>
+    </div>
+  </form>
+{% endif %}
+
         </div>
       </div>
     </div>

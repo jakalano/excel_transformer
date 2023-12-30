@@ -27,43 +27,148 @@ from django.views.decorators.csrf import csrf_exempt, csrf_protect
 from django.views.decorators.http import require_POST
 import re
 import json
+import openpyxl
+from openpyxl import load_workbook
 
 
 def main_page(request):
     context = {
         'previous_page_url': None,
         'next_page_url': 'summary',
-        'active_page': 'home'
+        'active_page': 'home',
+        'multiple_sheets': False,
+        'sheet_names': [],
+        'temp_file_path': request.session.get('temp_file_path', None),
+        'merged_cells': False,
     }
     if request.method == 'POST':
-        form = UploadFileForm(request.POST, request.FILES, error_class=ParagraphErrorList)
-        if form.is_valid():
-            uploaded_file = form.save()  # saves the original file
-            file_path = uploaded_file.file.path
-            request.session['file_path'] = file_path
-            df_orig = load_dataframe_from_file(file_path)
-            
-            # creates a modified copy
-            file_dir, file_name = os.path.split(file_path)
-            file_root, _ = os.path.splitext(file_name)
-            temp_file_path = os.path.join(file_dir, f"TEMP_{file_root}.csv")
-            
-            save_dataframe(df_orig, temp_file_path, file_format='csv')
-            df_orig = load_dataframe_from_file(temp_file_path)
-            html_table = dataframe_to_html(df_orig,classes='table table-striped preserve-whitespace')
-            request.session['html_table'] = html_table
-            request.session['temp_file_path'] = temp_file_path
-            print(temp_file_path)
-            return redirect('summary')
-            
-        else:
-            context['form'] = form  # adds the invalid form to the context so errors can be displayed
-            return render(request, '1_index.html', context)
+        if 'file_upload' in request.POST:
+            form = UploadFileForm(request.POST, request.FILES, error_class=ParagraphErrorList)
+            if form.is_valid():
+                uploaded_file = form.save()  # saves the original file
+                file_path = uploaded_file.file.path
+                request.session['temp_file_path'] = file_path
 
-    form = UploadFileForm()
-    context['form'] = form
+                # Check if the file is Excel and has multiple sheets
+                if file_path.endswith(('.xlsx', '.xls')):
+                    workbook = openpyxl.load_workbook(file_path)
+                    sheet = workbook.active
+                    if sheet.merged_cells.ranges:
+                        context['merged_cells'] = True
+                        context['form'] = form
+                        return render(request, '1_index.html', context)
+
+                    xls = pd.ExcelFile(file_path)
+                    sheet_names = xls.sheet_names
+                    if len(sheet_names) > 1:
+                        context['multiple_sheets'] = True
+                        context['sheet_names'] = sheet_names
+                        return render(request, '1_index.html', context)
+                    else:
+                        df_orig = pd.read_excel(file_path, sheet_name=sheet_names[0])
+
+                else:
+                    df_orig = load_dataframe_from_file(file_path)
+                
+                # creates a modified copy
+                file_dir, file_name = os.path.split(file_path)
+                file_root, _ = os.path.splitext(file_name)
+                temp_file_path = os.path.join(file_dir, f"TEMP_{file_root}.csv")
+                
+                save_dataframe(df_orig, temp_file_path, file_format='csv')
+                df_orig = load_dataframe_from_file(temp_file_path)
+                html_table = dataframe_to_html(df_orig,classes='table table-striped preserve-whitespace')
+                request.session['html_table'] = html_table
+                request.session['temp_file_path'] = temp_file_path
+                print(temp_file_path)
+                return redirect('summary')
+                
+            else:
+                context['form'] = form  # adds the invalid form to the context so errors can be displayed
+                return render(request, '1_index.html', context)
+        elif 'sheet_selection' in request.POST:
+            file_path = request.session.get('temp_file_path')
+            if file_path:
+                selected_sheet = request.POST.get('sheet')
+
+                # Check if the file is Excel and append or select sheets accordingly
+                if file_path.endswith(('.xlsx', '.xls')):
+                    xls = pd.ExcelFile(file_path)
+
+                    if selected_sheet == '__append_all__':
+                        # Append all sheets
+                        df_list = [pd.read_excel(xls, sheet_name=sheet) for sheet in xls.sheet_names]
+                        df_orig = pd.concat(df_list, ignore_index=True)
+                    else:
+                        # Load the selected sheet
+                        df_orig = pd.read_excel(xls, sheet_name=selected_sheet)
+
+                    # Process the DataFrame as required
+                    # For example, saving it as a CSV for further processing
+                    temp_file_dir, file_name = os.path.split(file_path)
+                    file_root, _ = os.path.splitext(file_name)
+                    temp_file_path = os.path.join(temp_file_dir, f"TEMP_{file_root}.csv")
+                    df_orig.to_csv(temp_file_path, index=False)
+
+                    # Update the session with the new file path
+                    request.session['temp_file_path'] = temp_file_path
+                    request.session['html_table'] = df_orig.to_html(classes='table table-striped preserve-whitespace')
+
+                else:
+                    # Handle the case for non-Excel files if necessary
+                    pass
+
+                # After processing, redirect to summary
+                return redirect('summary')
+        elif 'merged_cell_action' in request.POST:
+            file_path = request.session.get('temp_file_path')
+            merged_cell_action = request.POST.get('merged_cell_action')
+
+            if file_path and file_path.endswith(('.xlsx', '.xls')):
+                workbook = load_workbook(file_path)
+                sheet = workbook.active
+
+                if merged_cell_action == 'first_cell':
+                    # default behaviour
+                    pass
+                elif merged_cell_action == 'all_cells':
+                    unmerge_and_fill_all_cells(sheet)
+                elif merged_cell_action == 'delete_rows':
+                    delete_rows_with_merged_cells(sheet)
+
+                # Save the processed DataFrame and redirect
+                temp_file_path = os.path.join(os.path.dirname(file_path), 'processed.xlsx')
+                workbook.save(temp_file_path)
+                request.session['temp_file_path'] = temp_file_path
+
+                return redirect('summary')
+
+    else:
+        form = UploadFileForm()
+        context['form'] = form
+        return render(request, '1_index.html', context)
     
-    return render(request, '1_index.html', context)
+
+def unmerge_and_fill_all_cells(sheet):
+    # Create a list of merged cell ranges before modifying them
+    merged_ranges = list(sheet.merged_cells.ranges)
+
+    for merged_cell_range in merged_ranges:
+        top_left_cell = sheet.cell(row=merged_cell_range.min_row, column=merged_cell_range.min_col)
+        first_cell_value = top_left_cell.value
+        sheet.unmerge_cells(str(merged_cell_range))
+        for row in sheet.iter_rows(min_row=merged_cell_range.min_row, max_row=merged_cell_range.max_row,
+                                   min_col=merged_cell_range.min_col, max_col=merged_cell_range.max_col):
+            for cell in row:
+                cell.value = first_cell_value
+
+def delete_rows_with_merged_cells(sheet):
+    rows_to_delete = set()
+    for merged_cell_range in sheet.merged_cells.ranges:
+        for row in range(merged_cell_range.min_row, merged_cell_range.max_row + 1):
+            rows_to_delete.add(row)
+    for row in sorted(rows_to_delete, reverse=True):
+        sheet.delete_rows(row)
 
 def undo_last_action(request):
     print("Undo view accessed")
