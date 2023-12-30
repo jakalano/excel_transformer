@@ -19,7 +19,6 @@ pip freeze > requirements.txt
 - rework undo for the system to take snapshots every five actions that the redo -1 will be applied to? would increase performance for large files or long lists of actions. or create snapshots for every view?
 - fix undo
 - wrap each action in a collapsible wrapper to declutter the views?
-- fix split_column on repeating symbols (e.g., "aaaaa" split with value aa creates three new columns: *empty* | *empty* | a )
 - add "delete original columns" option to merge_columns
 - implement visual feedback to validate_data and check_duplicates
 
@@ -43,3 +42,4 @@ pip freeze > requirements.txt
 - disappearing pop-up after each action about how many values were changed
 - merge_columns no longer renames the column with the user-given custom name, defaults to merged_column
 - add "trim spaces" function
+- fix split_column on repeating symbols (e.g., "aaaaa" split with value aa creates three new columns: *empty* | *empty* | a )
