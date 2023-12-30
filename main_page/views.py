@@ -47,7 +47,9 @@ def main_page(request):
             if form.is_valid():
                 uploaded_file = form.save()  # saves the original file
                 file_path = uploaded_file.file.path
+                request.session['file_path'] = file_path
                 request.session['temp_file_path'] = file_path
+                print(f"file path after file upload: {file_path}")
 
                 # Check if the file is Excel and has multiple sheets
                 if file_path.endswith(('.xlsx', '.xls')):
@@ -80,7 +82,8 @@ def main_page(request):
                 html_table = dataframe_to_html(df_orig,classes='table table-striped preserve-whitespace')
                 request.session['html_table'] = html_table
                 request.session['temp_file_path'] = temp_file_path
-                print(temp_file_path)
+                print(f"file path after saving dataframe: {file_path}")
+                request.session.save()
                 return redirect('summary')
                 
             else:
@@ -147,306 +150,17 @@ def main_page(request):
         form = UploadFileForm()
         context['form'] = form
         return render(request, '1_index.html', context)
+
     
 
-def unmerge_and_fill_all_cells(sheet):
-    # Create a list of merged cell ranges before modifying them
-    merged_ranges = list(sheet.merged_cells.ranges)
-
-    for merged_cell_range in merged_ranges:
-        top_left_cell = sheet.cell(row=merged_cell_range.min_row, column=merged_cell_range.min_col)
-        first_cell_value = top_left_cell.value
-        sheet.unmerge_cells(str(merged_cell_range))
-        for row in sheet.iter_rows(min_row=merged_cell_range.min_row, max_row=merged_cell_range.max_row,
-                                   min_col=merged_cell_range.min_col, max_col=merged_cell_range.max_col):
-            for cell in row:
-                cell.value = first_cell_value
-
-def delete_rows_with_merged_cells(sheet):
-    rows_to_delete = set()
-    for merged_cell_range in sheet.merged_cells.ranges:
-        for row in range(merged_cell_range.min_row, merged_cell_range.max_row + 1):
-            rows_to_delete.add(row)
-    for row in sorted(rows_to_delete, reverse=True):
-        sheet.delete_rows(row)
-
-def undo_last_action(request):
-    print("Undo view accessed")
-    original_file_path = request.session.get('file_path')
-
-    if original_file_path is None:
-        print("Original file path is None!")
-        return JsonResponse({'status': 'error', 'error': 'Original file path not found'}, status=500)
-
-    # Extract the relative path using MEDIA_ROOT
-    relative_path = os.path.relpath(original_file_path, settings.MEDIA_ROOT).replace('\\', '/')
-
-    try:
-        current_file = UploadedFile.objects.get(file=relative_path)
-    except UploadedFile.DoesNotExist:
-        messages.error(request, "The file you're working on could not be found.")
-        return redirect('main_page')
-
-    # Retrieve the df from the file
-    df = load_dataframe_from_file(original_file_path)
-
-    # uses utils.py function to get actions
-    actions = get_actions_for_session(request.session.session_key, current_file, exclude_last_action=True)
-    
-    if actions.exists():
-        # Set the undone flag to True for the last action
-        last_action = Action.objects.filter(session_id=request.session.session_key, uploaded_file=current_file).latest('timestamp')
-        last_action.undone = True
-        last_action.save()
-
-        # Apply the actions
-        for action in actions:
-            df, current_view = apply_action(df, action.action_type, action.parameters, is_undo=True)
-            if current_view is None:
-                break
-
-    else:
-        current_view = None
-
-    # Check if current_view is not None before redirecting
-    if current_view is not None:
-        # Save the modified DataFrame back to the temporary file path
-        temp_file_path = request.session.get('temp_file_path')
-        save_dataframe(df, temp_file_path)
-        return redirect(current_view)
-    else:
-        messages.error(request, "An error occurred while undoing the last action.")
-        return redirect('summary')
-
-def apply_action(df, action_type, parameters, is_undo=False):
-    try:
-        print(f"Applying {action_type} with {parameters}")
-        # Print initial state of DataFrame
-        print("DataFrame before action:", df.head())
-        current_view = None  # Variable to hold the current view name
-
-        # Define view names for each action type
-        summary_view_actions = ['remove_empty_rows', 'remove_empty_cols', 'delete_first_X_rows', 'replace_header', 'delete_last_X_rows']
-        edit_columns_view_actions = ['add_column', 'delete_columns', 'fill_column', 'split_column', 'merge_columns', 'rename_column']
-        edit_data_view_actions = ['delete_data', 'replace_symbol', 'change_case', 'trim_and_replace_multiple_whitespaces']
-
-        # action handlers for summary view
-        if action_type in summary_view_actions:
-            current_view = 'summary'
-
-            if action_type == 'remove_empty_rows':
-                df, rows_removed = handle_remove_empty_rows(df)
-                
-            elif action_type == 'remove_empty_cols':
-                cols_to_delete = parameters.get('cols_to_delete')
-                df, cols_removed = handle_remove_empty_cols(df, cols_to_delete)
-
-                
-            elif action_type == 'delete_first_X_rows':
-                num_rows_to_delete_start = int(parameters.get('num_rows_to_delete_start', 0))
-                df = handle_delete_first_x_rows(df, num_rows_to_delete_start)
-                
-            elif action_type == 'replace_header':
-                df = handle_replace_header_with_first_row(df)
-                
-            elif action_type == 'delete_last_X_rows':
-                num_rows_to_delete_end = int(parameters.get('num_rows_to_delete_end', 0))
-                df = handle_delete_last_x_rows(df, num_rows_to_delete_end)
-                
-
-        # action handlers for edit_columns view
-        elif action_type in edit_columns_view_actions:
-            current_view = 'edit_columns'
-        
-            if action_type == 'add_column':
-                new_column_name = parameters.get('new_column_name')
-                df = add_column(df, new_column_name)
-                
-
-            elif action_type == 'delete_columns':
-                columns_to_delete = parameters.get('columns_to_delete')
-                df = delete_columns(df, columns_to_delete)
-                
-
-            elif action_type == 'fill_column':
-                column_to_fill = parameters.get('column_to_fill')
-                fill_value = parameters.get('fill_value')
-                fill_option = parameters.get('fill_option')
-                if column_to_fill and fill_value is not None:
-                    df = fill_column(df, column_to_fill, fill_value, fill_option)
-                
-
-            elif action_type == 'split_column':
-                column_to_split = parameters.get('column_to_split')
-                split_value = parameters.get('split_value')
-                delete_original = parameters.get('delete_original')
-                if column_to_split in df.columns and split_value:
-                    # performs the split operation
-                    df = split_column(df, column_to_split, split_value, delete_original)
-
-                
-
-            elif action_type == 'merge_columns':
-                columns_to_merge = parameters.get('columns_to_merge')
-                merge_separator = parameters.get('merge_separator', '')
-                new_column_name = parameters.get('new_column_name')
-
-                df = merge_columns(df, columns_to_merge, merge_separator, new_column_name)
-
-            elif action_type == 'rename_column':
-                if is_undo:
-                    column_to_rename = parameters.get('new_column_name')
-                    new_column_name = parameters.get('column_to_rename')
-                else:
-                    column_to_rename = parameters.get('column_to_rename')
-                    new_column_name = parameters.get('new_column_name')
-                if column_to_rename in df.columns and new_column_name:
-                    df = rename_column(df, column_to_rename, new_column_name)
-                
-
-        # action handlers for edit_data view
-        elif action_type in edit_data_view_actions:
-            current_view = 'edit_data'
-            if action_type == 'delete_data':
-                if is_undo:
-                    # Check if there is a backup available
-                    backup_path = Action.backup_data_path
-                    if backup_path:
-                        df_backup = pd.read_csv(backup_path)
-                        # logic to restore the original data from df_backup
-                        for column in df_backup.columns:
-                            df[column] = df_backup[column]
-                else:
-                    columns_to_modify = parameters.get('columns_to_modify')
-                    delimiter = parameters.get('delimiter')
-                    delete_option = parameters.get('delete_option')
-                    include_delimiter = parameters.get('include_delimiter')
-                    case_sensitive = parameters.get('case_sensitive')
-                    df = delete_data(df, columns_to_modify, delimiter, delete_option, include_delimiter, case_sensitive)
-                
-
-            elif action_type == 'replace_symbol':
-                columns_to_replace = parameters.get('columns_to_replace')
-                if is_undo:
-                    # Swap only when undoing
-                    old_symbol = parameters.get('new_symbol')
-                    new_symbol = parameters.get('old_symbol')
-                else:
-                    old_symbol = parameters.get('old_symbol')
-                    new_symbol = parameters.get('new_symbol')
-                case_sensitive = parameters.get('case_sensitive')
-
-                for column in columns_to_replace:
-                    df = replace_symbol(df, columns_to_replace, old_symbol, new_symbol, case_sensitive)
-
-            elif action_type == 'trim_and_replace_whitespaces':
-                columns_to_modify = parameters.get('columns_to_modify')
-                if columns_to_modify == 'All Columns':
-                    columns_to_modify = df.columns.tolist()
-                df = apply_trim_and_replace_whitespaces(df, columns_to_modify)
-
-            elif action_type == 'change_case':
-                columns_to_change_case = parameters.get('columns_to_change_case')
-                case_type = parameters.get('case_type')
-                if columns_to_change_case == 'All Columns':
-                    columns_to_change_case = df.columns.tolist()
-                df = change_case(df, columns_to_change_case, case_type)
-                
-
-        else:
-            print(f"Unknown action type: {action_type}")
-        print(f"DataFrame after applying {action_type}:", df.head())
-        return df, None
-    
-    except Exception as e:
-        print(f"Error applying action {action_type} with parameters {parameters}: {str(e)}")
-        return df, str(e)  # Return the DataFrame and the error message
-
-@login_required(login_url="/login/")
-def save_template(request):
-    if request.method == 'POST':
-        original_file_path = request.session.get('file_path')
-        relative_path = os.path.relpath(original_file_path, settings.MEDIA_ROOT).replace('\\', '/')
-        try:
-            current_file = UploadedFile.objects.get(file=relative_path)
-            df = load_dataframe_from_file(original_file_path)  # Assuming this function returns a pandas DataFrame
-            original_headers = df.columns.tolist()  # Extract headers from the DataFrame
-
-            actions = get_actions_for_session(request.session.session_key, current_file)
-            actions_data = [action_to_dict(action) for action in actions if not action.undone]  # Convert actions to a dict representation
-
-            # Check if actions_data is not empty
-            if not actions_data:
-                messages.error(request, "No actions to save in the template.")
-                return redirect('download')
-
-            template_name = request.POST.get('template_name')
-            # Create and save the template with actions_data and original_headers
-            template = Template.objects.create(
-                name=template_name, 
-                user=request.user, 
-                actions=actions_data, 
-                original_headers=original_headers
-            )
-            messages.success(request, f'Template "{template_name}" saved.')
-        except UploadedFile.DoesNotExist:
-            messages.error(request, "File not found.")
-        return redirect('download')
-    else:
-        messages.error(request, 'Invalid request')
-        return redirect('download')
-
-
-# def apply_template(request):
-#     if request.method == 'POST':
-#         print("post request")
-#         template_id = request.POST.get('template_id')
-#         temp_file_path = request.session.get('temp_file_path')
-#         print(f"applying {template_id} to {temp_file_path}")
-
-#         try:
-#             template = Template.objects.get(id=template_id, user=request.user)
-#             df = load_dataframe_from_file(temp_file_path)
-#             df = pd.DataFrame(df) if not isinstance(df, pd.DataFrame) else df
-
-#             # Compare headers
-#             current_headers = df.columns.tolist()
-#             print(f"current headers: {current_headers}, original headers: {template.original_headers}")
-#             if set(current_headers) != set(template.original_headers):
-#                 messages.error(request, "Headers of the current file do not match the template's original headers.")
-#                 return redirect('summary')
-#             else:
-#                 print("headers match")
-
-#             # Apply actions
-#             for action in template.actions:
-#                 action_type = action['action_type']
-#                 parameters = action['parameters']
-#                 df = apply_action(df, action_type, parameters)
-
-#             temp_file_path = request.session.get('temp_file_path')
-#             save_dataframe(df, temp_file_path)
-#             request.session['html_table'] = dataframe_to_html(df, classes='table table-striped')
-#             messages.success(request, "Template applied successfully.")
-#             return redirect('summary')
-
-#         except Template.DoesNotExist:
-#             messages.error(request, "Template not found or access denied.")
-#             return redirect('summary')
-
-#         except Exception as e:
-#             messages.error(request, str(e))
-#             return redirect('summary')
-
-#     # Redirect if not a POST request
-#     return redirect('summary')
 
 def summary(request):
     print("Entered summary view")
     temp_file_path = request.session.get('temp_file_path')
     file_path = request.session.get('file_path')
     df_v1 = load_dataframe_from_file(temp_file_path)
-    print(file_path)
+    print(f"file path in summary view: {file_path}")
+    print(f"temp file path in summary view: {temp_file_path}")
         # Check if a file has been uploaded
     if not temp_file_path or not file_path:
         messages.error(request, "No file uploaded. Please upload a file to proceed.")
@@ -1042,7 +756,7 @@ def edit_data(request):
 
 
 def download(request):
-    temp_file_path = request.session.get('temp_file_path')  # default to 'data'
+    temp_file_path = request.session.get('temp_file_path')  
     file_path = request.session.get('file_path')
 
     # Check if a file has been uploaded
@@ -1090,6 +804,8 @@ def download(request):
                 response = HttpResponse(f, content_type='application/json')
             elif file_format == 'xml':
                 response = HttpResponse(f, content_type='application/xml')
+            elif file_format == 'tsv':
+                response = HttpResponse(f, content_type='text/tab-separated-values')
         
             else:
                 # handle unexpected format
@@ -1205,3 +921,295 @@ def delete_template(request, template_id):
         return redirect('user_profile')
         # Or, return a JSON response for AJAX
         # return JsonResponse({'status': 'error', 'message': f'Error deleting template: {str(e)}'})
+
+def unmerge_and_fill_all_cells(sheet):
+    # Create a list of merged cell ranges before modifying them
+    merged_ranges = list(sheet.merged_cells.ranges)
+
+    for merged_cell_range in merged_ranges:
+        top_left_cell = sheet.cell(row=merged_cell_range.min_row, column=merged_cell_range.min_col)
+        first_cell_value = top_left_cell.value
+        sheet.unmerge_cells(str(merged_cell_range))
+        for row in sheet.iter_rows(min_row=merged_cell_range.min_row, max_row=merged_cell_range.max_row,
+                                   min_col=merged_cell_range.min_col, max_col=merged_cell_range.max_col):
+            for cell in row:
+                cell.value = first_cell_value
+
+def delete_rows_with_merged_cells(sheet):
+    rows_to_delete = set()
+    for merged_cell_range in sheet.merged_cells.ranges:
+        for row in range(merged_cell_range.min_row, merged_cell_range.max_row + 1):
+            rows_to_delete.add(row)
+    for row in sorted(rows_to_delete, reverse=True):
+        sheet.delete_rows(row)
+
+def undo_last_action(request):
+    print("Undo view accessed")
+    original_file_path = request.session.get('file_path')
+
+    if original_file_path is None:
+        print("Original file path is None!")
+        return JsonResponse({'status': 'error', 'error': 'Original file path not found'}, status=500)
+
+    # Extract the relative path using MEDIA_ROOT
+    relative_path = os.path.relpath(original_file_path, settings.MEDIA_ROOT).replace('\\', '/')
+
+    try:
+        current_file = UploadedFile.objects.get(file=relative_path)
+    except UploadedFile.DoesNotExist:
+        messages.error(request, "The file you're working on could not be found.")
+        return redirect('main_page')
+
+    # Retrieve the df from the file
+    df = load_dataframe_from_file(original_file_path)
+
+    # uses utils.py function to get actions
+    actions = get_actions_for_session(request.session.session_key, current_file, exclude_last_action=True)
+    
+    if actions.exists():
+        # Set the undone flag to True for the last action
+        last_action = Action.objects.filter(session_id=request.session.session_key, uploaded_file=current_file).latest('timestamp')
+        last_action.undone = True
+        last_action.save()
+
+        # Apply the actions
+        for action in actions:
+            df, current_view = apply_action(df, action.action_type, action.parameters, is_undo=True)
+            if current_view is None:
+                break
+
+    else:
+        current_view = None
+
+    # Check if current_view is not None before redirecting
+    if current_view is not None:
+        # Save the modified DataFrame back to the temporary file path
+        temp_file_path = request.session.get('temp_file_path')
+        save_dataframe(df, temp_file_path)
+        return redirect(current_view)
+    else:
+        messages.error(request, "An error occurred while undoing the last action.")
+        return redirect('summary')
+
+def apply_action(df, action_type, parameters, is_undo=False):
+    try:
+        print(f"Applying {action_type} with {parameters}")
+        # Print initial state of DataFrame
+        print("DataFrame before action:", df.head())
+        current_view = None  # Variable to hold the current view name
+
+        # Define view names for each action type
+        summary_view_actions = ['remove_empty_rows', 'remove_empty_cols', 'delete_first_X_rows', 'replace_header', 'delete_last_X_rows']
+        edit_columns_view_actions = ['add_column', 'delete_columns', 'fill_column', 'split_column', 'merge_columns', 'rename_column']
+        edit_data_view_actions = ['delete_data', 'replace_symbol', 'change_case', 'trim_and_replace_multiple_whitespaces']
+
+        # action handlers for summary view
+        if action_type in summary_view_actions:
+            current_view = 'summary'
+
+            if action_type == 'remove_empty_rows':
+                df, rows_removed = handle_remove_empty_rows(df)
+                
+            elif action_type == 'remove_empty_cols':
+                cols_to_delete = parameters.get('cols_to_delete')
+                df, cols_removed = handle_remove_empty_cols(df, cols_to_delete)
+
+                
+            elif action_type == 'delete_first_X_rows':
+                num_rows_to_delete_start = int(parameters.get('num_rows_to_delete_start', 0))
+                df = handle_delete_first_x_rows(df, num_rows_to_delete_start)
+                
+            elif action_type == 'replace_header':
+                df = handle_replace_header_with_first_row(df)
+                
+            elif action_type == 'delete_last_X_rows':
+                num_rows_to_delete_end = int(parameters.get('num_rows_to_delete_end', 0))
+                df = handle_delete_last_x_rows(df, num_rows_to_delete_end)
+                
+
+        # action handlers for edit_columns view
+        elif action_type in edit_columns_view_actions:
+            current_view = 'edit_columns'
+        
+            if action_type == 'add_column':
+                new_column_name = parameters.get('new_column_name')
+                df = add_column(df, new_column_name)
+                
+
+            elif action_type == 'delete_columns':
+                columns_to_delete = parameters.get('columns_to_delete')
+                df = delete_columns(df, columns_to_delete)
+                
+
+            elif action_type == 'fill_column':
+                column_to_fill = parameters.get('column_to_fill')
+                fill_value = parameters.get('fill_value')
+                fill_option = parameters.get('fill_option')
+                if column_to_fill and fill_value is not None:
+                    df = fill_column(df, column_to_fill, fill_value, fill_option)
+                
+
+            elif action_type == 'split_column':
+                column_to_split = parameters.get('column_to_split')
+                split_value = parameters.get('split_value')
+                delete_original = parameters.get('delete_original')
+                if column_to_split in df.columns and split_value:
+                    # performs the split operation
+                    df = split_column(df, column_to_split, split_value, delete_original)
+
+                
+
+            elif action_type == 'merge_columns':
+                columns_to_merge = parameters.get('columns_to_merge')
+                merge_separator = parameters.get('merge_separator', '')
+                new_column_name = parameters.get('new_column_name')
+
+                df = merge_columns(df, columns_to_merge, merge_separator, new_column_name)
+
+            elif action_type == 'rename_column':
+                if is_undo:
+                    column_to_rename = parameters.get('new_column_name')
+                    new_column_name = parameters.get('column_to_rename')
+                else:
+                    column_to_rename = parameters.get('column_to_rename')
+                    new_column_name = parameters.get('new_column_name')
+                if column_to_rename in df.columns and new_column_name:
+                    df = rename_column(df, column_to_rename, new_column_name)
+                
+
+        # action handlers for edit_data view
+        elif action_type in edit_data_view_actions:
+            current_view = 'edit_data'
+            if action_type == 'delete_data':
+                if is_undo:
+                    # Check if there is a backup available
+                    backup_path = Action.backup_data_path
+                    if backup_path:
+                        df_backup = pd.read_csv(backup_path)
+                        # logic to restore the original data from df_backup
+                        for column in df_backup.columns:
+                            df[column] = df_backup[column]
+                else:
+                    columns_to_modify = parameters.get('columns_to_modify')
+                    delimiter = parameters.get('delimiter')
+                    delete_option = parameters.get('delete_option')
+                    include_delimiter = parameters.get('include_delimiter')
+                    case_sensitive = parameters.get('case_sensitive')
+                    df = delete_data(df, columns_to_modify, delimiter, delete_option, include_delimiter, case_sensitive)
+                
+
+            elif action_type == 'replace_symbol':
+                columns_to_replace = parameters.get('columns_to_replace')
+                if is_undo:
+                    # Swap only when undoing
+                    old_symbol = parameters.get('new_symbol')
+                    new_symbol = parameters.get('old_symbol')
+                else:
+                    old_symbol = parameters.get('old_symbol')
+                    new_symbol = parameters.get('new_symbol')
+                case_sensitive = parameters.get('case_sensitive')
+
+                for column in columns_to_replace:
+                    df = replace_symbol(df, columns_to_replace, old_symbol, new_symbol, case_sensitive)
+
+            elif action_type == 'trim_and_replace_whitespaces':
+                columns_to_modify = parameters.get('columns_to_modify')
+                if columns_to_modify == 'All Columns':
+                    columns_to_modify = df.columns.tolist()
+                df = trim_and_replace_multiple_whitespaces(df, columns_to_modify)
+
+            elif action_type == 'change_case':
+                columns_to_change_case = parameters.get('columns_to_change_case')
+                case_type = parameters.get('case_type')
+                if columns_to_change_case == 'All Columns':
+                    columns_to_change_case = df.columns.tolist()
+                df = change_case(df, columns_to_change_case, case_type)
+                
+
+        else:
+            print(f"Unknown action type: {action_type}")
+        print(f"DataFrame after applying {action_type}:", df.head())
+        return df, None
+    
+    except Exception as e:
+        print(f"Error applying action {action_type} with parameters {parameters}: {str(e)}")
+        return df, str(e)  # Return the DataFrame and the error message
+
+@login_required(login_url="/login/")
+def save_template(request):
+    if request.method == 'POST':
+        original_file_path = request.session.get('file_path')
+        relative_path = os.path.relpath(original_file_path, settings.MEDIA_ROOT).replace('\\', '/')
+        try:
+            current_file = UploadedFile.objects.get(file=relative_path)
+            df = load_dataframe_from_file(original_file_path)  # Assuming this function returns a pandas DataFrame
+            original_headers = df.columns.tolist()  # Extract headers from the DataFrame
+
+            actions = get_actions_for_session(request.session.session_key, current_file)
+            actions_data = [action_to_dict(action) for action in actions if not action.undone]  # Convert actions to a dict representation
+
+            # Check if actions_data is not empty
+            if not actions_data:
+                messages.error(request, "No actions to save in the template.")
+                return redirect('download')
+
+            template_name = request.POST.get('template_name')
+            # Create and save the template with actions_data and original_headers
+            template = Template.objects.create(
+                name=template_name, 
+                user=request.user, 
+                actions=actions_data, 
+                original_headers=original_headers
+            )
+            messages.success(request, f'Template "{template_name}" saved.')
+        except UploadedFile.DoesNotExist:
+            messages.error(request, "File not found.")
+        return redirect('download')
+    else:
+        messages.error(request, 'Invalid request')
+        return redirect('download')
+
+
+# def apply_template(request):
+#     if request.method == 'POST':
+#         print("post request")
+#         template_id = request.POST.get('template_id')
+#         temp_file_path = request.session.get('temp_file_path')
+#         print(f"applying {template_id} to {temp_file_path}")
+
+#         try:
+#             template = Template.objects.get(id=template_id, user=request.user)
+#             df = load_dataframe_from_file(temp_file_path)
+#             df = pd.DataFrame(df) if not isinstance(df, pd.DataFrame) else df
+
+#             # Compare headers
+#             current_headers = df.columns.tolist()
+#             print(f"current headers: {current_headers}, original headers: {template.original_headers}")
+#             if set(current_headers) != set(template.original_headers):
+#                 messages.error(request, "Headers of the current file do not match the template's original headers.")
+#                 return redirect('summary')
+#             else:
+#                 print("headers match")
+
+#             # Apply actions
+#             for action in template.actions:
+#                 action_type = action['action_type']
+#                 parameters = action['parameters']
+#                 df = apply_action(df, action_type, parameters)
+
+#             temp_file_path = request.session.get('temp_file_path')
+#             save_dataframe(df, temp_file_path)
+#             request.session['html_table'] = dataframe_to_html(df, classes='table table-striped')
+#             messages.success(request, "Template applied successfully.")
+#             return redirect('summary')
+
+#         except Template.DoesNotExist:
+#             messages.error(request, "Template not found or access denied.")
+#             return redirect('summary')
+
+#         except Exception as e:
+#             messages.error(request, str(e))
+#             return redirect('summary')
+
+#     # Redirect if not a POST request
+#     return redirect('summary')

@@ -7,7 +7,7 @@ class UploadFileForm(forms.ModelForm):
         model = UploadedFile
         fields = ['file']
         widgets = {
-            'file': forms.ClearableFileInput(attrs={'accept': '.csv,.xls,.xlsx'})
+            'file': forms.ClearableFileInput(attrs={'accept': '.csv,.xls,.xlsx,.json,.xml,.tsv'})
         }
 
 class ParagraphErrorList(ErrorList):

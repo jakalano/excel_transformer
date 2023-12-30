@@ -15,19 +15,22 @@ def detect_delimiter(file_path, num_lines=5):
     return delimiter
 
 def load_dataframe_from_file(file_path):
-
     file_extension = os.path.splitext(file_path)[1].lower()
-    
 
     if file_extension == '.csv':
         delimiter = detect_delimiter(file_path)
         return pd.read_csv(file_path, delimiter=delimiter, encoding='utf8', dtype=str)
-    
     elif file_extension in ['.xlsx', '.xls']:
         return pd.read_excel(file_path, engine='openpyxl')
-    
+    elif file_extension == '.json':
+        return pd.read_json(file_path, dtype=str)
+    elif file_extension == '.xml':
+        return pd.read_xml(file_path, dtype=str)
+    elif file_extension == '.tsv':
+        return pd.read_csv(file_path, delimiter='\t', encoding='utf8', dtype=str)
     else:
         raise ValueError("Unsupported file type: {}".format(file_extension))
+
     
 def save_dataframe(df, save_path, file_format=None):
 
@@ -50,13 +53,30 @@ def save_dataframe(df, save_path, file_format=None):
     elif file_format == 'xlsx':
         df.to_excel(save_path, index=False, engine='openpyxl')
     elif file_format == 'json':
-        df.to_json(save_path, force_ascii=False)
+        df.to_json(save_path, orient='records', force_ascii=False)
     elif file_format == 'xml':
-        df.to_xml(save_path, index=False)
+        df = sanitize_column_names(df)
+        df.to_xml(save_path, index=False, root_name='Root', row_name='Row')
+    elif file_format == 'tsv':
+        df.to_csv(save_path, index=False, sep='\t')
     else:
         raise ValueError(f"Unsupported file format: {file_format}")
     
     return save_path
+
+def sanitize_column_names(df):
+    """Sanitize column names to make them valid XML tag names."""
+    def valid_xml_tag(col):
+        # Replace invalid characters with underscore
+        # Allow alphanumeric characters, including non-standard letters
+        col = re.sub(r'[^\w]', '_', col, flags=re.UNICODE)
+        # Prefix with 'col_' if the column name starts with a digit
+        if col[0].isdigit():
+            col = 'col_' + col
+        return col
+
+    df.columns = [valid_xml_tag(col) for col in df.columns]
+    return df
 
 def dataframe_to_html(df, classes=None):
 

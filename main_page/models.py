@@ -6,9 +6,10 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
 
 def validate_file_extension(value):
-    valid_content_type = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv', 'application/vnd.ms-excel']
-    if not value.file.content_type in valid_content_type:
-        raise ValidationError('Unsupported file type. Please upload a .csv, .xls or .xlsx file.')
+    valid_extensions = ['.csv', '.xls', '.xlsx', '.json', '.xml', '.tsv']
+    ext = os.path.splitext(value.name)[1]
+    if ext.lower() not in valid_extensions:
+        raise ValidationError('Unsupported file type. Please upload a .csv, .xls, .xlsx, .json, .xml, or .tsv file.')
 
 def get_upload_path(instance, filename):
     # Get the file extension
