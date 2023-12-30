@@ -473,10 +473,11 @@ def edit_columns(request):
             column_to_split = request.POST.get('column_to_split')
             split_value = request.POST.get('split_value')
             delete_original = 'delete_original' in request.POST
+            ignore_repeated = 'ignore_repeated' in request.POST
 
             if column_to_split in df_v2.columns and split_value:
                 # performs the split operation
-                df_v2 = split_column(df_v2, column_to_split, split_value, delete_original)
+                df_v2 = split_column(df_v2, column_to_split, split_value, delete_original, ignore_repeated)
             messages.success(request, f'Column "{column_to_split}" split successfully.')
             record_action(
                 uploaded_file=uploaded_file_instance,        
@@ -484,7 +485,8 @@ def edit_columns(request):
                 parameters={
                     'column_to_split': column_to_split,
                     'split_value': split_value,
-                    'delete_original': delete_original
+                    'delete_original': delete_original,
+                    'ignore_repeated': ignore_repeated
                 },
                 user=request.user,
                 session_id=request.session.session_key,

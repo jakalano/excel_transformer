@@ -209,13 +209,25 @@ def fill_column(df, column_to_fill, fill_value, fill_option):
         df[column_to_fill].fillna(fill_value, inplace=True)
     return df
 
-def split_column(df, column_to_split, split_value, delete_original):
-    split_data = df[column_to_split].str.split(split_value, expand=True)
+def split_column(df, column_to_split, split_value, delete_original, ignore_repeated):
+    temp_column = column_to_split + "_temp"
+
+    if ignore_repeated:
+        # Use a temporary column to handle repeated split values
+        df[temp_column] = df[column_to_split].str.replace(f'{split_value}+', split_value, regex=True)
+    else:
+        df[temp_column] = df[column_to_split]
+
+    split_data = df[temp_column].str.split(split_value, expand=True)
     for i, new_column in enumerate(split_data.columns):
         new_column_name = f"{column_to_split}_split_{i+1}"
         df[new_column_name] = split_data[new_column]
+
+    # Clean up: remove the temporary column and optionally the original column
+    df.drop(columns=[temp_column], inplace=True)
     if delete_original:
         df.drop(columns=[column_to_split], inplace=True)
+
     return df
 
 def merge_columns(df, columns_to_merge, merge_separator, new_column_name):
