@@ -27,8 +27,22 @@ class UploadedFile(models.Model):
 
 class Action(models.Model):
     ACTION_CHOICES = [
-        ('delete_row', 'Delete Row'),
-        # Add other actions as needed
+        ('remove_empty_rows', 'Remove Empty Rows'),
+        ('remove_empty_cols', 'Remove Empty Columns'),
+        ('delete_first_X_rows', 'Delete First X Rows'),
+        ('replace_header', 'Replace Header'),
+        ('delete_last_X_rows', 'Delete Last X Rows'),
+        ('add_column', 'Add Column'),
+        ('delete_columns', 'Delete Columns'),
+        ('fill_column', 'Fill Column'),
+        ('split_column', 'Split Column'),
+        ('merge_columns', 'Merge Columns'),
+        ('rename_column', 'Rename Column'),
+        ('delete_data', 'Delete Data'),
+        ('replace_symbol', 'Replace Symbol'),
+        ('change_case', 'Change Case'),
+        ('trim_and_replace_multiple_whitespaces', 'Trim and Replace Multiple Whitespaces'),
+
     ]
     uploaded_file = models.ForeignKey(UploadedFile, on_delete=models.CASCADE)
     action_type = models.CharField(choices=ACTION_CHOICES, max_length=50)

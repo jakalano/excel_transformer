@@ -4,10 +4,11 @@ from django.urls import reverse
 from unittest.mock import patch, MagicMock
 import pandas as pd
 import numpy as np
-from .models import UploadedFile, Action
+from .models import UploadedFile, Action, Template
 from django.contrib.auth.models import User
 import logging
 from unittest.mock import patch
+import json
 
 class SummaryViewTest(TestCase):
     def setUp(self):
@@ -21,6 +22,7 @@ class SummaryViewTest(TestCase):
 
         session = self.client.session
         session['file_path'] = 'media/_TEST_20231223233536/TEMP__TEST.csv'
+        session['temp_file_path'] = 'media/_TEST_20231223233536/TEMP__TEST_EDITED.csv'
         session.save()
 
         self.logger.debug("setUp completed")
@@ -129,6 +131,7 @@ class EditColumnsViewTest(TestCase):
 
         session = self.client.session
         session['file_path'] = 'media/_TEST_20231223233536/TEMP__TEST.csv'
+        session['temp_file_path'] = 'media/_TEST_20231223233536/TEMP__TEST_EDITED.csv'
         session.save()
 
     @patch('main_page.views.load_dataframe_from_file')
@@ -277,6 +280,7 @@ class EditDataViewTest(TestCase):
 
         session = self.client.session
         session['file_path'] = 'media/_TEST_20231223233536/TEMP__TEST.csv'
+        session['temp_file_path'] = 'media/_TEST_20231223233536/TEMP__TEST_EDITED.csv'
         session.save()
 
 
@@ -336,6 +340,48 @@ class EditDataViewTest(TestCase):
         self.assertTrue((updated_df['A'] == ['1', '2', '3']).all())
         self.assertEqual(response.status_code, 302)
 
+    @patch('main_page.views.load_dataframe_from_file')
+    @patch('main_page.views.save_dataframe')
+    @patch('main_page.views.UploadedFile.objects.get')
+    @patch('main_page.models.Action.objects.create')
+    def test_trim_and_replace_whitespaces(self, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
+        df = pd.DataFrame({'A': ['  text  with   spaces  ', '  another   text  ']})
+        mock_load_df.return_value = df
+        mock_get_uploaded_file.return_value = UploadedFile(file='media/_TEST_20231223233536/TEMP__TEST.csv')
+        mock_save_df.side_effect = lambda df, path: path
+
+        url = reverse('edit_data')
+        response = self.client.post(url, {
+            'action': 'trim_and_replace_whitespaces',
+            'columns_to_trim': ['A']
+        })
+
+        updated_df = mock_save_df.call_args[0][0]
+        expected_output = ['text with spaces', 'another text']
+        self.assertListEqual(updated_df['A'].tolist(), expected_output)
+        self.assertEqual(response.status_code, 302)
+
+    @patch('main_page.views.load_dataframe_from_file')
+    @patch('main_page.views.save_dataframe')
+    @patch('main_page.views.UploadedFile.objects.get')
+    @patch('main_page.models.Action.objects.create')
+    def test_change_case(self, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
+        df = pd.DataFrame({'A': ['text', 'another text']})
+        mock_load_df.return_value = df
+        mock_get_uploaded_file.return_value = UploadedFile(file='media/_TEST_20231223233536/TEMP__TEST.csv')
+        mock_save_df.side_effect = lambda df, path: path
+
+        url = reverse('edit_data')
+        response = self.client.post(url, {
+            'action': 'change_case',
+            'columns_to_change_case': ['A'],
+            'case_type': 'upper'
+        })
+
+        updated_df = mock_save_df.call_args[0][0]
+        expected_output = ['TEXT', 'ANOTHER TEXT']
+        self.assertListEqual(updated_df['A'].tolist(), expected_output)
+        self.assertEqual(response.status_code, 302)
 
     # @patch('main_page.views.load_dataframe_from_file')
     # @patch('main_page.views.save_dataframe')

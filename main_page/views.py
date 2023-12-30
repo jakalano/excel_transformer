@@ -123,7 +123,7 @@ def apply_action(df, action_type, parameters, is_undo=False):
         # Define view names for each action type
         summary_view_actions = ['remove_empty_rows', 'remove_empty_cols', 'delete_first_X_rows', 'replace_header', 'delete_last_X_rows']
         edit_columns_view_actions = ['add_column', 'delete_columns', 'fill_column', 'split_column', 'merge_columns', 'rename_column']
-        edit_data_view_actions = ['delete_data', 'replace_symbol']
+        edit_data_view_actions = ['delete_data', 'replace_symbol', 'change_case', 'trim_and_replace_multiple_whitespaces']
 
         # action handlers for summary view
         if action_type in summary_view_actions:
@@ -203,13 +203,20 @@ def apply_action(df, action_type, parameters, is_undo=False):
         elif action_type in edit_data_view_actions:
             current_view = 'edit_data'
             if action_type == 'delete_data':
-                # Check if there is a backup available
-                backup_path = Action.backup_data_path
-                if backup_path:
-                    df_backup = pd.read_csv(backup_path)
-                    # logic to restore the original data from df_backup
-                    for column in df_backup.columns:
-                        df[column] = df_backup[column]
+                if is_undo:
+                    # Check if there is a backup available
+                    backup_path = Action.backup_data_path
+                    if backup_path:
+                        df_backup = pd.read_csv(backup_path)
+                        # logic to restore the original data from df_backup
+                        for column in df_backup.columns:
+                            df[column] = df_backup[column]
+                else:
+                    columns_to_modify = parameters.get('columns_to_modify')
+                    delimiter = parameters.get('delimiter')
+                    delete_option = parameters.get('delete_option')
+                    include_delimiter = parameters.get('include_delimiter')
+                    df = delete_data(df, columns_to_modify, delimiter, delete_option, include_delimiter)
                 
 
             elif action_type == 'replace_symbol':
@@ -237,7 +244,7 @@ def apply_action(df, action_type, parameters, is_undo=False):
                 case_type = parameters.get('case_type')
                 if columns_to_change_case == 'All Columns':
                     columns_to_change_case = df.columns.tolist()
-                df = apply_change_case(df, columns_to_change_case, case_type)
+                df = change_case(df, columns_to_change_case, case_type)
                 
 
         else:
@@ -329,6 +336,7 @@ def save_template(request):
 #     return redirect('summary')
 
 def summary(request):
+    print("Entered summary view")
     temp_file_path = request.session.get('temp_file_path')
     file_path = request.session.get('file_path')
     df_v1 = load_dataframe_from_file(temp_file_path)
@@ -359,8 +367,10 @@ def summary(request):
     empty_cols = df_v1.columns[df_v1.isna().all()].tolist()
 
     if request.method == 'POST':
+        print("POST request received in summary view")
         # deletes all empty rows
         if 'remove_empty_rows' in request.POST:
+            print("remove_empty_rows action detected")
             try:
                 df_v1, rows_removed = handle_remove_empty_rows(df_v1)
 
@@ -523,8 +533,9 @@ def summary(request):
 
             save_dataframe(df_v1, temp_file_path)
             messages.success(request, "Headers mapped successfully.")
-        
+        print("About to save DataFrame")
         temp_file_path = save_dataframe(df_v1, temp_file_path)
+        print(f"DataFrame saved to: {temp_file_path}")
         # updates the session with the new file path
         request.session['temp_file_path'] = temp_file_path
         # redirects to avoid resubmit on refresh
