@@ -168,8 +168,12 @@ def summary(request):
     # Extract the relative path using MEDIA_ROOT
     relative_path = os.path.relpath(file_path, settings.MEDIA_ROOT).replace('\\', '/')
     print(relative_path)
-    # Retrieve templates for the current user
-    user_templates = Template.objects.filter(user=request.user)
+        # Check if the user is authenticated before querying the database
+    if request.user.is_authenticated:
+        user_templates = Template.objects.filter(user=request.user)
+    else:
+        user_templates = Template.objects.none()
+
     # Retrieve from session
     header_mismatch = request.session.get('header_mismatch', False)
     mismatched_headers = request.session.get('mismatched_headers', ([], []))
