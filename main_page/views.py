@@ -647,30 +647,66 @@ def edit_data(request):
             validation_type = request.POST.get('validation_type')
             regex_pattern = request.POST.get('regex_pattern')
             ignore_whitespace = 'ignore_whitespace' in request.POST
+            ignore_empty = 'ignore_empty' in request.POST
             apply_to_all = '__all__' in columns_to_validate
+
+            print("Validation Type:", validation_type)
+            print("Ignore Whitespace:", ignore_whitespace)
+            print("Ignore Empty:", ignore_empty)
+            print("Apply to All Columns:", apply_to_all)
 
             if apply_to_all:
                 columns_to_validate = df_v3.columns.tolist()
 
             invalid_rows = {}
+            total_invalid_rows = 0
 
             for column in columns_to_validate:
                 if column in df_v3.columns:
-                    column_series = df_v3[column].fillna('').astype(str)
+                    column_series = df_v3[column].astype(str)
                     invalid_rows[column] = []
 
                     for index, value in column_series.items():
+                        print(f"Validating column '{column}', row {index}, value: '{value}'")
+
+                        # Check for empty cells based on ignore_empty flag
+                        if pd.isna(df_v3.at[index, column]):
+                            if not ignore_empty:
+                                invalid_rows[column].append(index)
+                            continue  # Skip further validation for this cell
+
                         if ignore_whitespace:
                             value = value.replace(' ', '')
 
+                        is_invalid = False
                         if validation_type == 'letters' and not value.isalpha():
-                            invalid_rows[column].append(index)
+                            is_invalid = True
                         elif validation_type == 'numbers' and not value.isdigit():
-                            invalid_rows[column].append(index)
+                            is_invalid = True
                         elif validation_type == 'no_specials' and not value.isalnum():
-                            invalid_rows[column].append(index)
+                            is_invalid = True
                         elif validation_type == 'regex' and not re.match(regex_pattern, value):
+                            is_invalid = True
+
+                        if is_invalid:
                             invalid_rows[column].append(index)
+
+                    total_invalid_rows += len(invalid_rows[column])
+
+            print(f"Total invalid rows: {total_invalid_rows}")
+            print("Invalid rows details:", invalid_rows)
+
+            # Constructing the message
+            if total_invalid_rows > 0:
+                invalid_message = f"Validation failed for {total_invalid_rows} rows. \n"
+                for column, rows in invalid_rows.items():
+                    if rows:
+                        invalid_message += f"In column '{column}': Rows {', '.join(map(str, rows))}\n"
+                messages.error(request, invalid_message)
+            else:
+                messages.success(request, "All rows validated successfully.")
+
+
 
             # TODO process and display invalid rows in the table
             print(f"Invalid rows: {invalid_rows}")
