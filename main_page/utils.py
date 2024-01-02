@@ -32,7 +32,16 @@ def load_dataframe_from_file(file_path):
         raise ValueError("Unsupported file type: {}".format(file_extension))
 
     
-def save_dataframe(df, save_path, file_format=None):
+def save_dataframe(data, save_path, file_format=None):
+
+    # Check if data is a dictionary and extract DataFrame if necessary
+    if isinstance(data, dict) and 'dataframe' in data:
+        df = data['dataframe']
+    elif isinstance(data, pd.DataFrame):
+        df = data
+    else:
+        raise ValueError("Invalid data type for saving. Expected a DataFrame or a dictionary containing a DataFrame.")
+
 
     # Infer file format from save_path if not provided
     if file_format is None:
@@ -148,7 +157,7 @@ def handle_remove_empty_rows(df):
         df = df.dropna(how='all')
         final_row_count = df.shape[0]
         rows_removed = initial_row_count - final_row_count
-        return df, rows_removed
+        return {'dataframe': df, 'rows_removed': rows_removed}
     except Exception as e:
         raise ValueError(f"Error while removing empty rows: {e}")
 
@@ -158,7 +167,7 @@ def handle_remove_empty_cols(df, cols_to_delete):
         df = df.drop(columns=cols_to_delete)
         final_col_count = df.shape[1]
         cols_removed = initial_col_count - final_col_count
-        return df, cols_removed
+        return {'dataframe': df, 'cols_removed': cols_removed}
     except Exception as e:
         raise ValueError(f"Error while removing empty columns: {e}")
 
@@ -168,7 +177,7 @@ def handle_delete_first_x_rows(df, num_rows_to_delete_start):
         df = df.iloc[num_rows_to_delete_start:]
         final_row_count = df.shape[0]
         rows_deleted = initial_row_count - final_row_count
-        return df, rows_deleted
+        return {'dataframe': df, 'rows_deleted': rows_deleted}
     except Exception as e:
         raise ValueError(f"Error while deleting the first {num_rows_to_delete_start} rows: {e}")
 
@@ -179,7 +188,7 @@ def handle_delete_last_x_rows(df, num_rows_to_delete_end):
             df = df.iloc[:-num_rows_to_delete_end]
         final_row_count = df.shape[0]
         rows_deleted = initial_row_count - final_row_count
-        return df, rows_deleted
+        return {'dataframe': df, 'rows_deleted': rows_deleted}
     except Exception as e:
         raise ValueError(f"Error while deleting the last {num_rows_to_delete_end} rows: {e}")
 
@@ -230,7 +239,7 @@ def split_column(df, column_to_split, split_value, delete_original, ignore_repea
 
     return df
 
-def merge_columns(df, columns_to_merge, merge_separator, new_column_name):
+def merge_columns(df, columns_to_merge, merge_separator, new_column_name, delete_original):
     if not new_column_name:
         # Use a counter to create a unique name
         existing_columns = [col for col in df.columns if col.startswith('merged_column_')]
@@ -242,7 +251,9 @@ def merge_columns(df, columns_to_merge, merge_separator, new_column_name):
         ),
         axis=1
     )
-    return df
+    if delete_original:
+        df.drop(columns=columns_to_merge, inplace=True)
+    return {'dataframe': df, 'new_column_name': new_column_name}
 
 def rename_column(df, column_to_rename, new_column_name):
     df.rename(columns={column_to_rename: new_column_name}, inplace=True)

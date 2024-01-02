@@ -196,8 +196,9 @@ def summary(request):
         if 'remove_empty_rows' in request.POST:
             print("remove_empty_rows action detected")
             try:
-                df_v1, rows_removed = handle_remove_empty_rows(df_v1)
-
+                result = handle_remove_empty_rows(df_v1)
+                df_v1 = result['dataframe']
+                rows_removed = result['rows_removed']
                 messages.success(request, f'{rows_removed} empty rows removed.')
             except ValueError as e:
                 messages.error(request, str(e))
@@ -213,8 +214,9 @@ def summary(request):
         elif 'remove_empty_cols' in request.POST:
             try:
                 cols_to_delete = request.POST.getlist('remove_empty_cols')
-                df_v1, cols_removed = handle_remove_empty_cols(df_v1, cols_to_delete)
-
+                result = handle_remove_empty_cols(df_v1, cols_to_delete)
+                df_v1 = result['dataframe']
+                cols_removed = result['cols_removed']
 
                 messages.success(request, f'{cols_removed} empty columns removed.')
             except ValueError as e:
@@ -235,8 +237,10 @@ def summary(request):
                 else:
                     num_rows_to_delete_start = 0
                 if num_rows_to_delete_start > 0:
-                    df_v1, _ = handle_delete_first_x_rows(df_v1, num_rows_to_delete_start)
-                    messages.success(request, f'First {num_rows_to_delete_start} rows deleted successfully.')
+                    result = handle_delete_first_x_rows(df_v1, num_rows_to_delete_end)
+                    df_v1 = result['dataframe']
+                    rows_deleted = result['rows_deleted']
+                    messages.success(request, f'First {rows_deleted} rows deleted successfully.')
 
                     record_action(        
                             uploaded_file=uploaded_file_instance,
@@ -273,8 +277,10 @@ def summary(request):
                 else:
                     num_rows_to_delete_end = 0
                 if num_rows_to_delete_end > 0:
-                    df_v1, _ = handle_delete_last_x_rows(df_v1, num_rows_to_delete_end)
-                    messages.success(request, f'Last {num_rows_to_delete_end} rows deleted successfully.')
+                    result = handle_delete_last_x_rows(df_v1, num_rows_to_delete_end)
+                    df_v1 = result['dataframe']
+                    rows_deleted = result['rows_deleted']
+                    messages.success(request, f'Last {rows_deleted} rows deleted successfully.')
 
                     record_action(        
                             uploaded_file=uploaded_file_instance,
@@ -501,18 +507,24 @@ def edit_columns(request):
             columns_to_merge = request.POST.getlist('columns_to_merge')
             merge_separator = request.POST.get('merge_separator', '')
             new_column_name = request.POST.get('new_merge_column_name')
+            delete_original = 'delete_original_after_merge' in request.POST
 
+            merge_result = merge_columns(df_v2, columns_to_merge, merge_separator, new_column_name, delete_original)
+            df_v2 = merge_result['dataframe']  # Update DataFrame
+            used_column_name = merge_result['new_column_name']  # Extract the new column name
 
-
-            df_v2 = merge_columns(df_v2, columns_to_merge, merge_separator, new_column_name)
-            messages.success(request, f'Columns merged into "{new_column_name}" successfully.')
+            merge_message = f'Columns {", ".join(columns_to_merge)} merged into "{used_column_name}" successfully.'
+            if delete_original:
+                merge_message += ' Original columns have been deleted.'
+            messages.success(request, merge_message)
             record_action(
                 uploaded_file=uploaded_file_instance,        
                 action_type='merge_columns',
                 parameters={
                     'columns_to_merge': columns_to_merge,
                     'merge_separator': merge_separator,
-                    'new_column_name': new_column_name
+                    'new_column_name': used_column_name,
+                    'delete_original': delete_original
                 },
                 user=request.user,
                 session_id=request.session.session_key,
@@ -720,13 +732,15 @@ def edit_data(request):
                 duplicates = df_v3[df_v3.duplicated(subset=columns_to_check, keep=False)]
                 duplicates.sort_values(by=columns_to_check, inplace=True)
 
-                # converts df to JSON
-                duplicates_json = duplicates.to_json(orient='records')
 
-                # sets the JSON data in the session
-                request.session['duplicates_json'] = duplicates_json
-            print(f"Found {len(duplicates)} duplicates")
-            # TODO implement filter for all duplicate values in the table 
+                # Construct the message
+                if not duplicates.empty:
+                    duplicate_rows = duplicates.index.tolist()
+                    message = f"Found {len(duplicates)} duplicate rows: {', '.join(map(str, duplicate_rows))}."
+                    messages.error(request, message)
+                else:
+                    messages.success(request, "No duplicates found.")
+
 
         elif action == 'trim_and_replace_whitespaces':
             columns_to_modify = request.POST.getlist('columns_to_trim')
@@ -1050,23 +1064,27 @@ def apply_action(df, action_type, parameters, is_undo=False):
             current_view = 'summary'
 
             if action_type == 'remove_empty_rows':
-                df, rows_removed = handle_remove_empty_rows(df)
+                result = handle_remove_empty_rows(df)
+                df = result['dataframe']
                 
             elif action_type == 'remove_empty_cols':
                 cols_to_delete = parameters.get('cols_to_delete')
-                df, cols_removed = handle_remove_empty_cols(df, cols_to_delete)
+                result = handle_remove_empty_cols(df, cols_to_delete)
+                df = result['dataframe']
 
                 
             elif action_type == 'delete_first_X_rows':
                 num_rows_to_delete_start = int(parameters.get('num_rows_to_delete_start', 0))
-                df = handle_delete_first_x_rows(df, num_rows_to_delete_start)
+                result = handle_delete_first_x_rows(df, num_rows_to_delete_start)
+                df = result['dataframe']
                 
             elif action_type == 'replace_header':
                 df = handle_replace_header_with_first_row(df)
                 
             elif action_type == 'delete_last_X_rows':
                 num_rows_to_delete_end = int(parameters.get('num_rows_to_delete_end', 0))
-                df = handle_delete_last_x_rows(df, num_rows_to_delete_end)
+                result = handle_delete_last_x_rows(df, num_rows_to_delete_end)
+                df = result['dataframe']
                 
 
         # action handlers for edit_columns view
@@ -1105,8 +1123,10 @@ def apply_action(df, action_type, parameters, is_undo=False):
                 columns_to_merge = parameters.get('columns_to_merge')
                 merge_separator = parameters.get('merge_separator', '')
                 new_column_name = parameters.get('new_column_name')
+                delete_original = parameters.get('delete_original', False)
 
-                df = merge_columns(df, columns_to_merge, merge_separator, new_column_name)
+                result = merge_columns(df, columns_to_merge, merge_separator, new_column_name, delete_original)
+                df = result['dataframe']
 
             elif action_type == 'rename_column':
                 if is_undo:
