@@ -1000,7 +1000,7 @@ def undo_last_action(request):
     # determines the current view based on the request path, default to summary
     current_view = request.POST.get('current_view', 'summary')
     original_file_path = request.session.get('file_path')
-
+    print(f"Current view: {current_view}")
     if original_file_path is None:
         print("Original file path is None!")
         return JsonResponse({'status': 'error', 'error': 'Original file path not found'}, status=500)
@@ -1040,10 +1040,8 @@ def undo_last_action(request):
                 # skips applying the last action
                 if action.id == last_action.id:
                     continue
-                df, current_view = apply_action(df, action.action_type, action.parameters, is_undo=True)
+                df = apply_action(df, action.action_type, action.parameters, is_undo=True)
                 print(f"Applied action: {action.action_type}, Current view: {current_view}")
-                if current_view is None:
-                    break
             except Exception as e:
                 messages.error(request, f"An error occurred while undoing the last action: {str(e)}")
                 action_failed = True
@@ -1085,148 +1083,136 @@ def apply_action(df, action_type, parameters, is_undo=False):
         print(f"Applying {action_type} with {parameters}")
         # prints initial state of df
         print("DataFrame before action:", df.head())
-        current_view = None  # variable to hold the current view name
 
-        # defines view names for each action type
-        summary_view_actions = ['remove_empty_rows', 'remove_empty_cols', 'delete_first_X_rows', 'replace_header', 'delete_last_X_rows']
-        edit_columns_view_actions = ['add_column', 'delete_columns', 'fill_column', 'split_column', 'merge_columns', 'rename_column']
-        edit_data_view_actions = ['delete_data', 'replace_symbol', 'change_case', 'trim_and_replace_multiple_whitespaces']
 
-        # action handlers for summary view
-        if action_type in summary_view_actions:
-            current_view = 'summary'
+        if action_type == 'remove_empty_rows':
+            result = handle_remove_empty_rows(df)
+            df = result['dataframe']
+            
+        elif action_type == 'remove_empty_cols':
+            cols_to_delete = parameters.get('cols_to_delete')
+            result = handle_remove_empty_cols(df, cols_to_delete)
+            df = result['dataframe']
 
-            if action_type == 'remove_empty_rows':
-                result = handle_remove_empty_rows(df)
-                df = result['dataframe']
-                
-            elif action_type == 'remove_empty_cols':
-                cols_to_delete = parameters.get('cols_to_delete')
-                result = handle_remove_empty_cols(df, cols_to_delete)
-                df = result['dataframe']
+            
+        elif action_type == 'delete_first_X_rows':
+            num_rows_to_delete_start = int(parameters.get('num_rows_to_delete_start', 0))
+            result = handle_delete_first_x_rows(df, num_rows_to_delete_start)
+            df = result['dataframe']
+            
+        elif action_type == 'replace_header':
+            df = handle_replace_header_with_first_row(df)
+            
+        elif action_type == 'delete_last_X_rows':
+            num_rows_to_delete_end = int(parameters.get('num_rows_to_delete_end', 0))
+            result = handle_delete_last_x_rows(df, num_rows_to_delete_end)
+            df = result['dataframe']
+            
 
-                
-            elif action_type == 'delete_first_X_rows':
-                num_rows_to_delete_start = int(parameters.get('num_rows_to_delete_start', 0))
-                result = handle_delete_first_x_rows(df, num_rows_to_delete_start)
-                df = result['dataframe']
-                
-            elif action_type == 'replace_header':
-                df = handle_replace_header_with_first_row(df)
-                
-            elif action_type == 'delete_last_X_rows':
-                num_rows_to_delete_end = int(parameters.get('num_rows_to_delete_end', 0))
-                result = handle_delete_last_x_rows(df, num_rows_to_delete_end)
-                df = result['dataframe']
-                
 
-        # action handlers for edit_columns view
-        elif action_type in edit_columns_view_actions:
-            current_view = 'edit_columns'
+    
+        if action_type == 'add_column':
+            new_column_name = parameters.get('new_column_name')
+            df = add_column(df, new_column_name)
+            
+
+        elif action_type == 'delete_columns':
+            columns_to_delete = parameters.get('columns_to_delete')
+            df = delete_columns(df, columns_to_delete)
+            
+
+        elif action_type == 'fill_column':
+            column_to_fill = parameters.get('column_to_fill')
+            fill_value = parameters.get('fill_value')
+            fill_option = parameters.get('fill_option')
+            if column_to_fill and fill_value is not None:
+                df = fill_column(df, column_to_fill, fill_value, fill_option)
+            
+
+        elif action_type == 'split_column':
+            column_to_split = parameters.get('column_to_split')
+            split_value = parameters.get('split_value')
+            delete_original = parameters.get('delete_original')
+            ignore_repeated = parameters.get('ignore_repeated', False)
+            if column_to_split in df.columns and split_value:
+                df = split_column(df, column_to_split, split_value, delete_original, ignore_repeated)
+
+            
+
+        elif action_type == 'merge_columns':
+            columns_to_merge = parameters.get('columns_to_merge')
+            merge_separator = parameters.get('merge_separator', '')
+            new_column_name = parameters.get('new_column_name')
+            delete_original = parameters.get('delete_original', False)
+
+            result = merge_columns(df, columns_to_merge, merge_separator, new_column_name, delete_original)
+            df = result['dataframe']
+
+        elif action_type == 'rename_column':
+            if is_undo:
+                column_to_rename = parameters.get('new_column_name')
+                new_column_name = parameters.get('column_to_rename')
+            else:
+                column_to_rename = parameters.get('column_to_rename')
+                new_column_name = parameters.get('new_column_name')
+            if column_to_rename in df.columns and new_column_name:
+                df = rename_column(df, column_to_rename, new_column_name)
+            
+
+
         
-            if action_type == 'add_column':
-                new_column_name = parameters.get('new_column_name')
-                df = add_column(df, new_column_name)
-                
-
-            elif action_type == 'delete_columns':
-                columns_to_delete = parameters.get('columns_to_delete')
-                df = delete_columns(df, columns_to_delete)
-                
-
-            elif action_type == 'fill_column':
-                column_to_fill = parameters.get('column_to_fill')
-                fill_value = parameters.get('fill_value')
-                fill_option = parameters.get('fill_option')
-                if column_to_fill and fill_value is not None:
-                    df = fill_column(df, column_to_fill, fill_value, fill_option)
-                
-
-            elif action_type == 'split_column':
-                column_to_split = parameters.get('column_to_split')
-                split_value = parameters.get('split_value')
-                delete_original = parameters.get('delete_original')
-                ignore_repeated = parameters.get('ignore_repeated', False)
-                if column_to_split in df.columns and split_value:
-                    df = split_column(df, column_to_split, split_value, delete_original, ignore_repeated)
-
-                
-
-            elif action_type == 'merge_columns':
-                columns_to_merge = parameters.get('columns_to_merge')
-                merge_separator = parameters.get('merge_separator', '')
-                new_column_name = parameters.get('new_column_name')
-                delete_original = parameters.get('delete_original', False)
-
-                result = merge_columns(df, columns_to_merge, merge_separator, new_column_name, delete_original)
-                df = result['dataframe']
-
-            elif action_type == 'rename_column':
-                if is_undo:
-                    column_to_rename = parameters.get('new_column_name')
-                    new_column_name = parameters.get('column_to_rename')
-                else:
-                    column_to_rename = parameters.get('column_to_rename')
-                    new_column_name = parameters.get('new_column_name')
-                if column_to_rename in df.columns and new_column_name:
-                    df = rename_column(df, column_to_rename, new_column_name)
-                
-
-        # action handlers for edit_data view
-        elif action_type in edit_data_view_actions:
-            current_view = 'edit_data'
-            if action_type == 'delete_data':
-                if is_undo:
-                    # checks if there is a backup available
-                    backup_path = Action.backup_data_path
-                    if backup_path:
-                        df_backup = pd.read_csv(backup_path)
-                        # logic to restore the original data from df_backup
-                        for column in df_backup.columns:
-                            df[column] = df_backup[column]
-                else:
-                    columns_to_modify = parameters.get('columns_to_modify')
-                    delimiter = parameters.get('delimiter')
-                    delete_option = parameters.get('delete_option')
-                    include_delimiter = parameters.get('include_delimiter')
-                    case_sensitive = parameters.get('case_sensitive')
-                    df = delete_data(df, columns_to_modify, delimiter, delete_option, include_delimiter, case_sensitive)
-                
-
-            elif action_type == 'replace_symbol':
-                columns_to_replace = parameters.get('columns_to_replace')
-                if is_undo:
-                    # Swap only when undoing
-                    old_symbol = parameters.get('new_symbol')
-                    new_symbol = parameters.get('old_symbol')
-                else:
-                    old_symbol = parameters.get('old_symbol')
-                    new_symbol = parameters.get('new_symbol')
-                case_sensitive = parameters.get('case_sensitive')
-
-                for column in columns_to_replace:
-                    df = replace_symbol(df, columns_to_replace, old_symbol, new_symbol, case_sensitive)
-
-            elif action_type == 'trim_and_replace_whitespaces':
+        if action_type == 'delete_data':
+            if is_undo:
+                # checks if there is a backup available
+                backup_path = Action.backup_data_path
+                if backup_path:
+                    df_backup = pd.read_csv(backup_path)
+                    # logic to restore the original data from df_backup
+                    for column in df_backup.columns:
+                        df[column] = df_backup[column]
+            else:
                 columns_to_modify = parameters.get('columns_to_modify')
-                if columns_to_modify == 'All Columns':
-                    columns_to_modify = df.columns.tolist()
-                df = trim_and_replace_multiple_whitespaces(df, columns_to_modify)
+                delimiter = parameters.get('delimiter')
+                delete_option = parameters.get('delete_option')
+                include_delimiter = parameters.get('include_delimiter')
+                case_sensitive = parameters.get('case_sensitive')
+                df = delete_data(df, columns_to_modify, delimiter, delete_option, include_delimiter, case_sensitive)
+            
 
-            elif action_type == 'change_case':
-                columns_to_change_case = parameters.get('columns_to_change_case')
-                case_type = parameters.get('case_type')
-                if columns_to_change_case == 'All Columns':
-                    columns_to_change_case = df.columns.tolist()
-                df = change_case(df, columns_to_change_case, case_type)
-                
+        elif action_type == 'replace_symbol':
+            columns_to_replace = parameters.get('columns_to_replace')
+            if is_undo:
+                # Swap only when undoing
+                old_symbol = parameters.get('new_symbol')
+                new_symbol = parameters.get('old_symbol')
+            else:
+                old_symbol = parameters.get('old_symbol')
+                new_symbol = parameters.get('new_symbol')
+            case_sensitive = parameters.get('case_sensitive')
+
+            for column in columns_to_replace:
+                df = replace_symbol(df, columns_to_replace, old_symbol, new_symbol, case_sensitive)
+
+        elif action_type == 'trim_and_replace_whitespaces':
+            columns_to_modify = parameters.get('columns_to_modify')
+            if columns_to_modify == 'All Columns':
+                columns_to_modify = df.columns.tolist()
+            df = trim_and_replace_multiple_whitespaces(df, columns_to_modify)
+
+        elif action_type == 'change_case':
+            columns_to_change_case = parameters.get('columns_to_change_case')
+            case_type = parameters.get('case_type')
+            if columns_to_change_case == 'All Columns':
+                columns_to_change_case = df.columns.tolist()
+            df = change_case(df, columns_to_change_case, case_type)
+            
 
         else:
             print(f"Unknown action type: {action_type}")
-            return df, None
+            return df
         
         print(f"DataFrame after applying {action_type}:", df.head())
-        return df, current_view
+        return df
     
     except Exception as e:
         print(f"Error applying action {action_type} with parameters {parameters}: {str(e)}")
