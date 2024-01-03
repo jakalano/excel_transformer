@@ -94,16 +94,16 @@ def main_page(request):
             if file_path:
                 selected_sheet = request.POST.get('sheet')
 
-                # Check if the file is Excel and append or select sheets accordingly
+                # checks if the file is Excel and appends or selects sheets accordingly
                 if file_path.endswith(('.xlsx', '.xls')):
                     xls = pd.ExcelFile(file_path)
 
                     if selected_sheet == '__append_all__':
-                        # Append all sheets
+                        # appends all sheets
                         df_list = [pd.read_excel(xls, sheet_name=sheet) for sheet in xls.sheet_names]
                         df_orig = pd.concat(df_list, ignore_index=True)
                     else:
-                        # Load the selected sheet
+                        # loads the selected sheet
                         df_orig = pd.read_excel(xls, sheet_name=selected_sheet)
 
                     temp_file_dir, file_name = os.path.split(file_path)
@@ -111,7 +111,7 @@ def main_page(request):
                     temp_file_path = os.path.join(temp_file_dir, f"TEMP_{file_root}.csv")
                     df_orig.to_csv(temp_file_path, index=False)
 
-                    # Update the session with the new file path
+                    # updates the session with the new file path
                     request.session['temp_file_path'] = temp_file_path
                     request.session['html_table'] = df_orig.to_html(classes='table table-striped preserve-whitespace')
 
@@ -148,7 +148,6 @@ def main_page(request):
                     delete_rows_with_merged_cells(sheet)
 
                 df_orig = pd.DataFrame(sheet.values)
-                # Set the first row as headers if necessary
                 df_orig.columns = df_orig.iloc[0]
                 df_orig = df_orig[1:]
                 file_dir, file_name = os.path.split(file_path)
@@ -179,20 +178,20 @@ def summary(request):
     df_v1 = load_dataframe_from_file(temp_file_path)
     print(f"file path in summary view: {file_path}")
     print(f"temp file path in summary view: {temp_file_path}")
-        # Check if a file has been uploaded
+        # checks if a file has been uploaded
     if not temp_file_path or not file_path:
         messages.error(request, "No file uploaded. Please upload a file to proceed.")
         return redirect('main_page')
-    # Extract the relative path using MEDIA_ROOT
+    # extracts the relative path using MEDIA_ROOT
     relative_path = os.path.relpath(file_path, settings.MEDIA_ROOT).replace('\\', '/')
     print(relative_path)
-        # Check if the user is authenticated before querying the database
+        # checks if the user is authenticated before querying the database
     if request.user.is_authenticated:
         user_templates = Template.objects.filter(user=request.user)
     else:
         user_templates = Template.objects.none()
 
-    # Retrieve from session
+    # retrieves data from session
     header_mismatch = request.session.get('header_mismatch', False)
     mismatched_headers = request.session.get('mismatched_headers', ([], []))
     mismatched_headers_marked = ([], [])
@@ -202,9 +201,9 @@ def summary(request):
     try:
         uploaded_file_instance = UploadedFile.objects.get(file=relative_path)
     except UploadedFile.DoesNotExist:
-        # Handle the case where the UploadedFile instance doesn't exist
+        # handles the case where the UploadedFile instance doesn't exist
         messages.error(request, "The file you're working on could not be found.")
-        return redirect('main_page')  # Redirect to a safe page
+        return redirect('main_page')  # redirects to a safe page
     # identifies emty columns
     empty_cols = df_v1.columns[df_v1.isna().all()].tolist()
 
@@ -229,7 +228,7 @@ def summary(request):
                 )
            
         # deletes selected columns
-        elif 'remove_empty_cols' in request.POST:
+        if 'remove_empty_cols' in request.POST:
             try:
                 cols_to_delete = request.POST.getlist('remove_empty_cols')
                 result = handle_remove_empty_cols(df_v1, cols_to_delete)
@@ -270,7 +269,7 @@ def summary(request):
             except ValueError as e:
                 messages.error(request, str(e))
         
-        # if replace_header is True, set the df columns to the first row's values
+        # if replace_header is True, sets the df columns to the first row's values
         if 'replace_header' in request.POST:
             try:
                 df_v1 = handle_replace_header_with_first_row(df_v1)
@@ -286,7 +285,6 @@ def summary(request):
             except ValueError as e:
                 messages.error(request, str(e))
 
-# Handle deletion of the last X rows
         if 'num_rows_to_delete_end' in request.POST:
             try:
                 num_rows_to_delete_end = request.POST.get('num_rows_to_delete_end', '0').strip()
@@ -327,23 +325,21 @@ def summary(request):
                     mismatched_headers = (current_headers, template.original_headers)
                     print(f"{mismatched_headers}")
 
-   
-                    # Store in session
                     request.session['header_mismatch'] = header_mismatch
                     request.session['mismatched_headers'] = mismatched_headers
                     
                 else:
                     print("headers match")
                     mismatched_headers_marked = ([], [])
-                    print("Applying actions from template:", template.actions)  # Check actions
+                    print("Applying actions from template:", template.actions) 
                     for action in template.actions:
                         action_type = action['action_type']
                         parameters = action['parameters']
                         df_original, error_message = apply_action(df_original, action_type, parameters)
                         if error_message:
-                            # If there's an error, display it and revert to the original df
+                            # if there's an error, displays it and reverts to the original df
                             messages.error(request, f"Error applying template: {error_message}")
-                            save_dataframe(df_original, temp_file_path)  # Save the original df
+                            save_dataframe(df_original, temp_file_path)  # saves the original df
                             return redirect('summary')
                     
                     df_v1 = df_original
@@ -354,23 +350,22 @@ def summary(request):
             except Template.DoesNotExist:
                 messages.error(request, "Template not found or access denied.")
 
-        # Adjust columns logic
         if 'adjust_columns' in request.POST:
             new_columns = request.POST.getlist('new_column[]')
             columns_to_delete = request.POST.getlist('delete_columns[]')
             
-            # Adding new columns
+            # adding new columns
             for col in new_columns:
                 if col:  # Add column if name is provided
                     df_v1[col] = None
 
-            # Removing selected columns
+            # removing selected columns
             df_v1.drop(columns=columns_to_delete, errors='ignore', inplace=True)
             
             save_dataframe(df_v1, temp_file_path)
             messages.success(request, "Columns adjusted successfully.")
 
-        # Map headers logic
+        # map headers logic
         if 'map_headers' in request.POST:
             for header in df_v1.columns:
                 print(f'old header-{header}')
@@ -389,9 +384,8 @@ def summary(request):
         # redirects to avoid resubmit on refresh
         return redirect('summary')
     
-        # Clear the session values if they are not needed anymore
+        # clears the session values if they are not needed anymore
     if header_mismatch:
-        # Code to process header mismatch...
         current_mismatched = set(mismatched_headers[0])
         template_mismatched = set(mismatched_headers[1])
         diff_headers = current_mismatched.symmetric_difference(template_mismatched)
@@ -428,19 +422,19 @@ def summary(request):
 def edit_columns(request):
     temp_file_path = request.session.get('temp_file_path')
     file_path = request.session.get('file_path')
-        # Check if a file has been uploaded
+        # checks if a file has been uploaded
     if not temp_file_path or not file_path:
         messages.error(request, "No file uploaded. Please upload a file to proceed.")
         return redirect('main_page')
-    # Extract the relative path using MEDIA_ROOT
+    # extracts the relative path using MEDIA_ROOT
     relative_path = os.path.relpath(file_path, settings.MEDIA_ROOT).replace('\\', '/')
 
     try:
         uploaded_file_instance = UploadedFile.objects.get(file=relative_path)
     except UploadedFile.DoesNotExist:
-        # Handle the case where the UploadedFile instance doesn't exist
+        # handles the case where the UploadedFile instance doesn't exist
         messages.error(request, "The file you're working on could not be found.")
-        return redirect('main_page')  # Redirect to a safe page
+        return redirect('main_page')  # redirects to a safe page
     df_v2 = load_dataframe_from_file(temp_file_path)
 
     if request.method == 'POST':
@@ -460,8 +454,6 @@ def edit_columns(request):
             )
 
 
-
-            # handles deleting selected columns
         elif action == 'delete_columns':
             columns_to_delete = request.POST.getlist('columns_to_delete')
             df_v2 = delete_columns(df_v2, columns_to_delete)
@@ -528,8 +520,8 @@ def edit_columns(request):
             delete_original = 'delete_original_after_merge' in request.POST
 
             merge_result = merge_columns(df_v2, columns_to_merge, merge_separator, new_column_name, delete_original)
-            df_v2 = merge_result['dataframe']  # Update df
-            used_column_name = merge_result['new_column_name']  # Extract the new column name
+            df_v2 = merge_result['dataframe']  # updates df
+            used_column_name = merge_result['new_column_name']  # extracts the new column name
 
             merge_message = f'Columns {", ".join(columns_to_merge)} merged into "{used_column_name}" successfully.'
             if delete_original:
@@ -577,7 +569,7 @@ def edit_columns(request):
         'next_page_url': 'edit_data',
         'table': dataframe_to_html(df_v2, classes='table table-striped preserve-whitespace'),
         'original_file_name': os.path.basename(file_path),
-        'df_v2': df_v2,  # passes the df to the template context
+        'df_v2': df_v2,
     }
     return render(request, '3_edit_columns.html', context)
 
@@ -585,25 +577,24 @@ def edit_data(request):
 
     temp_file_path = request.session.get('temp_file_path')
     file_path = request.session.get('file_path')
-    # Check if a file has been uploaded
+    # checks if a file has been uploaded
     if not temp_file_path or not file_path:
         messages.error(request, "No file uploaded. Please upload a file to proceed.")
         return redirect('main_page')
-    # Extract the relative path using MEDIA_ROOT
+    # extracts the relative path using MEDIA_ROOT
     relative_path = os.path.relpath(file_path, settings.MEDIA_ROOT).replace('\\', '/')
 
     try:
         uploaded_file_instance = UploadedFile.objects.get(file=relative_path)
     except UploadedFile.DoesNotExist:
-        # Handle the case where the UploadedFile instance doesn't exist
+        # handles the case where the UploadedFile instance doesn't exist
         messages.error(request, "The file you're working on could not be found.")
-        return redirect('main_page')  # Redirect to a safe page
+        return redirect('main_page')  # redirects to a safe page
     df_v3 = load_dataframe_from_file(temp_file_path)
     if request.method == 'POST':
-        print("POST request received")  # this should always print when a form is submitted
+        print("POST request received")
         action = request.POST.get('action')
         print(f"Action received: {action}")  # prints the action value
-
 
         if action == 'delete_data':
             columns_to_modify = request.POST.getlist('columns_to_modify')
@@ -621,7 +612,7 @@ def edit_data(request):
                 messages.success(request, 'Data deleted successfully based on your criteria.')
             except ValueError as e:
                 messages.error(request, str(e))
-            df_backup = df_v3[columns_to_modify].copy()  # Backup the original data
+            df_backup = df_v3[columns_to_modify].copy()  # backups the original data
             record_action(
                 uploaded_file=uploaded_file_instance,        
                 action_type='delete_data',
@@ -699,11 +690,11 @@ def edit_data(request):
                     for index, value in column_series.items():
                         print(f"Validating column '{column}', row {index}, value: '{value}'")
 
-                        # Check for empty cells based on ignore_empty flag
+                        # checks for empty cells based on ignore_empty flag
                         if pd.isna(df_v3.at[index, column]):
                             if not ignore_empty:
                                 invalid_rows[column].append(index)
-                            continue  # Skip further validation for this cell
+                            continue  # skips further validation for this cell
 
                         if ignore_whitespace:
                             value = value.replace(' ', '')
@@ -736,9 +727,6 @@ def edit_data(request):
             else:
                 messages.success(request, "All rows validated successfully.")
 
-
-
-            # TODO process and display invalid rows in the table
             print(f"Invalid rows: {invalid_rows}")
 
         elif action == 'check_duplicates':
@@ -751,7 +739,7 @@ def edit_data(request):
                 duplicates.sort_values(by=columns_to_check, inplace=True)
 
 
-                # Construct the message
+                # constructs the duplicate message
                 if not duplicates.empty:
                     duplicate_rows = duplicates.index.tolist()
                     message = f"Found {len(duplicates)} duplicate rows: {', '.join(map(str, duplicate_rows))}."
@@ -812,16 +800,13 @@ def edit_data(request):
         return redirect('edit_data')
     
     context = {
-        # 'num_empty_rows': df[df.isna().all(axis=1)].shape[0],
-        # 'num_empty_cols': df.columns[df.isna().all(axis=0)].size,
         'previous_page_url': 'edit_columns',
         'active_page': 'edit_data',
         'next_page_url': 'download',
         'table': dataframe_to_html(df_v3, classes='table table-striped preserve-whitespace'),
         'original_file_name': os.path.basename(file_path),
-        'df_v3': df_v3,  # Pass the df to the template context
+        'df_v3': df_v3,
         'duplicates_json': request.session.get('duplicates_json', '[]'),  # pass the duplicates as JSON
-        #'showing_duplicates': 'duplicates_json' in request.session and bool(request.session['duplicates_json'])
     }
     
     return render(request, '4_edit_data.html', context)
@@ -833,7 +818,7 @@ def download(request):
     temp_file_path = request.session.get('temp_file_path')  
     file_path = request.session.get('file_path')
 
-    # Check if a file has been uploaded
+    # checks if a file has been uploaded
     if not temp_file_path or not file_path:
         messages.error(request, "No file uploaded. Please upload a file to proceed.")
         return redirect('main_page')
@@ -847,9 +832,6 @@ def download(request):
     }
     file_format = request.GET.get('format')
     print(f"File format: {file_format}")
-
-    ############# for filtering from db session activities for template creation
-    ############# actions_for_session = Action.objects.filter(session_id=some_session_key)
 
     
     if file_format:
@@ -896,14 +878,14 @@ def download(request):
 
 @login_required(login_url="/login/")
 def user_profile(request):
-    user_templates = Template.objects.filter(user=request.user)  # Retrieves templates for the current user
+    user_templates = Template.objects.filter(user=request.user)  # retrieves templates for the current user
 
     context = {
         'user': request.user,
         'templates': user_templates,
-        'date_joined': request.user.date_joined,  # User's date of joining
-        'last_login': request.user.last_login,    # User's last login
-        'active_page': 'user_profile',            # For highlighting the active page in the navbar
+        'date_joined': request.user.date_joined, 
+        'last_login': request.user.last_login,    
+        'active_page': 'user_profile', # for highlighting the active page in the navbar
     }
     return render(request, 'user_profile.html', context)
 
@@ -930,7 +912,7 @@ def adjust_columns(request):
         # Adding new columns
         new_columns = request.POST.getlist('new_column[]')
         for col in new_columns:
-            if col:  # Add column if name is provided
+            if col:  # adds column if name is provided
                 df[col] = None
 
         # Removing selected columns
@@ -948,7 +930,7 @@ def map_headers(request):
     if request.method == 'POST':
         df = load_dataframe_from_file(temp_file_path)
 
-        # Mapping headers based on user input
+        # maps headers based on user input
         for header in df.columns:
             new_header = request.POST.get(f'header-{header}')
             if new_header:
@@ -967,7 +949,7 @@ def delete_file(request):
             if file_path:
                 try:
                     os.remove(file_path)
-                    del request.session['file_path']  # Remove file path from session
+                    del request.session['file_path']  # removes file path from session
                     return JsonResponse({'status': 'success'}, status=200)
                 except Exception as e:
                     return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
@@ -979,25 +961,21 @@ def delete_file(request):
 @require_POST
 @csrf_protect
 def delete_template(request, template_id):
-    # Get the template object, ensuring it belongs to the current user
+    # gets the template object, ensuring it belongs to the current user
     template = get_object_or_404(Template, id=template_id, user=request.user)
 
     try:
         template.delete()
         messages.success(request, 'Template deleted successfully.')
-        # Redirect after successful deletion
+        # redirects after successful deletion
         return redirect('user_profile')
-        # Or, return a JSON response for AJAX
-        # return JsonResponse({'status': 'success', 'message': 'Template deleted successfully.'})
     except Exception as e:
         messages.error(request, f'Error deleting template: {str(e)}')
-        # Redirect after failure
+        # redirects after failure
         return redirect('user_profile')
-        # Or, return a JSON response for AJAX
-        # return JsonResponse({'status': 'error', 'message': f'Error deleting template: {str(e)}'})
 
 def unmerge_and_fill_all_cells(sheet):
-    # Create a list of merged cell ranges before modifying them
+    # vreates a list of merged cell ranges before modifying them
     merged_ranges = list(sheet.merged_cells.ranges)
 
     for merged_cell_range in merged_ranges:
@@ -1019,7 +997,7 @@ def delete_rows_with_merged_cells(sheet):
 
 def undo_last_action(request):
     print("Undo view accessed")
-    # determine the current view based on the request path, default to summary
+    # determines the current view based on the request path, default to summary
     current_view = request.POST.get('current_view', 'summary')
     original_file_path = request.session.get('file_path')
 
@@ -1029,7 +1007,7 @@ def undo_last_action(request):
 
     print(f"Original file path: {original_file_path}")
 
-    # Extract the relative path using MEDIA_ROOT
+    # extracts the relative path using MEDIA_ROOT
     relative_path = os.path.relpath(original_file_path, settings.MEDIA_ROOT).replace('\\', '/')
     print(f"Relative path: {relative_path}")
 
@@ -1041,25 +1019,25 @@ def undo_last_action(request):
         messages.error(request, "The file you're working on could not be found.")
         return redirect('main_page')
 
-    # Retrieve the df from the file
+    # retrieves the df from the file
     df = load_dataframe_from_file(original_file_path)
     print("DataFrame loaded from file.")
 
-    # Retrieve actions that are not undone yet
+    # retrieves actions that are not undone yet
     actions = get_actions_for_session(request.session.session_key, current_file, exclude_last_action=False)
     print(f"Actions retrieved: {actions}")
 
     if actions.exists():
-        # Mark the last action as undone
+        # marks the last action as undone
         last_action = actions.latest('timestamp')
 
         action_failed = False
 
 
-        # Apply the actions
+        # apply the actions
         for action in actions:
             try:
-                # Skip applying the last action which is just marked as undone
+                # skips applying the last action
                 if action.id == last_action.id:
                     continue
                 df, current_view = apply_action(df, action.action_type, action.parameters, is_undo=True)
@@ -1072,15 +1050,15 @@ def undo_last_action(request):
                 break
         
         if not action_failed and last_action:
-        # Mark the last action as undone only if no errors occurred in applying actions
+        # marks the last action as undone only if no errors occurred in applying actions
             last_action.undone = True
             last_action.save()
             print("Last action marked as undone.")
-        # Retrieve action name and parameters
+        # retrieves action name and parameters
         action_name = last_action.action_type.replace('_', ' ').capitalize()
         action_params = last_action.parameters if last_action.parameters else {}
 
-        # Format parameters for display
+        # formats parameters for display
         formatted_params = ', '.join([f'{key}: {value}' for key, value in action_params.items()])
         message = f"Successfully undone action: '{action_name}' with parameters ({formatted_params})."
         messages.success(request, message)
@@ -1089,9 +1067,9 @@ def undo_last_action(request):
         print("No actions to undo.")
         return redirect(current_view)
 
-    # Check if current_view is not None before redirecting
+    # checks if current_view is not None before redirecting
     if current_view is not None:
-        # save the modified df back to the temporary file path
+        # saves the modified df back to the temporary file path
         temp_file_path = request.session.get('temp_file_path')
         save_dataframe(df, temp_file_path)
         print("DataFrame saved, redirecting to current view:", current_view)
@@ -1105,11 +1083,11 @@ def undo_last_action(request):
 def apply_action(df, action_type, parameters, is_undo=False):
     try:
         print(f"Applying {action_type} with {parameters}")
-        # Print initial state of df
+        # prints initial state of df
         print("DataFrame before action:", df.head())
-        current_view = None  # Variable to hold the current view name
+        current_view = None  # variable to hold the current view name
 
-        # Define view names for each action type
+        # defines view names for each action type
         summary_view_actions = ['remove_empty_rows', 'remove_empty_cols', 'delete_first_X_rows', 'replace_header', 'delete_last_X_rows']
         edit_columns_view_actions = ['add_column', 'delete_columns', 'fill_column', 'split_column', 'merge_columns', 'rename_column']
         edit_data_view_actions = ['delete_data', 'replace_symbol', 'change_case', 'trim_and_replace_multiple_whitespaces']
@@ -1170,7 +1148,6 @@ def apply_action(df, action_type, parameters, is_undo=False):
                 delete_original = parameters.get('delete_original')
                 ignore_repeated = parameters.get('ignore_repeated', False)
                 if column_to_split in df.columns and split_value:
-                    # performs the split operation
                     df = split_column(df, column_to_split, split_value, delete_original, ignore_repeated)
 
                 
@@ -1200,7 +1177,7 @@ def apply_action(df, action_type, parameters, is_undo=False):
             current_view = 'edit_data'
             if action_type == 'delete_data':
                 if is_undo:
-                    # Check if there is a backup available
+                    # checks if there is a backup available
                     backup_path = Action.backup_data_path
                     if backup_path:
                         df_backup = pd.read_csv(backup_path)
@@ -1253,7 +1230,7 @@ def apply_action(df, action_type, parameters, is_undo=False):
     
     except Exception as e:
         print(f"Error applying action {action_type} with parameters {parameters}: {str(e)}")
-        return df, str(e)  # Return the df and the error message
+        return df, str(e)  # returns the df and the error message
 
 @login_required(login_url="/login/")
 def save_template(request):
@@ -1262,19 +1239,19 @@ def save_template(request):
         relative_path = os.path.relpath(original_file_path, settings.MEDIA_ROOT).replace('\\', '/')
         try:
             current_file = UploadedFile.objects.get(file=relative_path)
-            df = load_dataframe_from_file(original_file_path)  # Assuming this function returns a pandas df
-            original_headers = df.columns.tolist()  # Extract headers from the df
+            df = load_dataframe_from_file(original_file_path)  
+            original_headers = df.columns.tolist()  # extracts headers from the df
 
             actions = get_actions_for_session(request.session.session_key, current_file)
-            actions_data = [action_to_dict(action) for action in actions if not action.undone]  # Convert actions to a dict representation
+            actions_data = [action_to_dict(action) for action in actions if not action.undone]  # convert sactions to a dict representation
 
-            # Check if actions_data is not empty
+            # checks if actions_data is not empty
             if not actions_data:
                 messages.error(request, "No actions to save in the template.")
                 return redirect('download')
 
             template_name = request.POST.get('template_name')
-            # Create and save the template with actions_data and original_headers
+            # creates and saves the template with actions_data and original_headers
             template = Template.objects.create(
                 name=template_name, 
                 user=request.user, 
@@ -1288,48 +1265,3 @@ def save_template(request):
     else:
         messages.error(request, 'Invalid request')
         return redirect('download')
-
-
-# def apply_template(request):
-#     if request.method == 'POST':
-#         print("post request")
-#         template_id = request.POST.get('template_id')
-#         temp_file_path = request.session.get('temp_file_path')
-#         print(f"applying {template_id} to {temp_file_path}")
-
-#         try:
-#             template = Template.objects.get(id=template_id, user=request.user)
-#             df = load_dataframe_from_file(temp_file_path)
-#             df = pd.DataFrame(df) if not isinstance(df, pd.DataFrame) else df
-
-#             # Compare headers
-#             current_headers = df.columns.tolist()
-#             print(f"current headers: {current_headers}, original headers: {template.original_headers}")
-#             if set(current_headers) != set(template.original_headers):
-#                 messages.error(request, "Headers of the current file do not match the template's original headers.")
-#                 return redirect('summary')
-#             else:
-#                 print("headers match")
-
-#             # Apply actions
-#             for action in template.actions:
-#                 action_type = action['action_type']
-#                 parameters = action['parameters']
-#                 df = apply_action(df, action_type, parameters)
-
-#             temp_file_path = request.session.get('temp_file_path')
-#             save_dataframe(df, temp_file_path)
-#             request.session['html_table'] = dataframe_to_html(df, classes='table table-striped')
-#             messages.success(request, "Template applied successfully.")
-#             return redirect('summary')
-
-#         except Template.DoesNotExist:
-#             messages.error(request, "Template not found or access denied.")
-#             return redirect('summary')
-
-#         except Exception as e:
-#             messages.error(request, str(e))
-#             return redirect('summary')
-
-#     # Redirect if not a POST request
-#     return redirect('summary')

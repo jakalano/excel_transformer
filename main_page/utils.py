@@ -287,14 +287,21 @@ def delete_data(df, columns_to_modify, delimiter, delete_option, include_delimit
 
                 if include_delimiter:
                     if delete_option == 'before':
-                        df[column] = column_series.apply(lambda x: re.split(pattern, x)[-1] if re.search(pattern, x) else x)
+                        # Deletes everything before the delimiter, including the delimiter itself
+                        df[column] = column_series.apply(lambda x: ''.join(re.split(pattern, x)[1:]) if re.search(pattern, x) else x)
                     elif delete_option == 'after':
-                        df[column] = column_series.apply(lambda x: re.split(pattern, x)[0] if re.search(pattern, x) else x)
+                        # Deletes everything after the delimiter and the delimiter itself
+                        df[column] = column_series.apply(lambda x: re.split(pattern, x, 1)[0] if re.search(pattern, x) else x)
                 else:
                     if delete_option == 'before':
-                        df[column] = column_series.apply(lambda x: re.split(pattern, x, 1)[-1] if re.search(pattern, x) else x)
+                        # Deletes everything before the delimiter but leaves the delimiter alone
+                        df[column] = column_series.apply(lambda x: delimiter + ''.join(re.split(pattern, x)[1:]) if re.search(pattern, x) else x)
+
                     elif delete_option == 'after':
-                        df[column] = column_series.apply(lambda x: delimiter + re.split(pattern, x, 1)[-1] if re.search(pattern, x) else x)
+                        # Deletes everything after the delimiter but leaves the delimiter alone
+                        df[column] = column_series.apply(lambda x: re.split(pattern, x, 1)[0] + delimiter if re.search(pattern, x) else x)
+
+
             except Exception as e:
                 raise ValueError(f"Error processing column {column}: {e}")
     return df
