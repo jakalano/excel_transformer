@@ -51,7 +51,7 @@ def main_page(request):
                 request.session['temp_file_path'] = file_path
                 print(f"file path after file upload: {file_path}")
 
-                # Check if the file is Excel and has multiple sheets
+                # checks if the file is excel file and has multiple sheets
                 if file_path.endswith(('.xlsx', '.xls')):
                     workbook = openpyxl.load_workbook(file_path)
                     sheet = workbook.active
@@ -106,8 +106,6 @@ def main_page(request):
                         # Load the selected sheet
                         df_orig = pd.read_excel(xls, sheet_name=selected_sheet)
 
-                    # Process the df as required
-                    # For example, saving it as a CSV for further processing
                     temp_file_dir, file_name = os.path.split(file_path)
                     file_root, _ = os.path.splitext(file_name)
                     temp_file_path = os.path.join(temp_file_dir, f"TEMP_{file_root}.csv")
@@ -118,17 +116,27 @@ def main_page(request):
                     request.session['html_table'] = df_orig.to_html(classes='table table-striped preserve-whitespace')
 
                 else:
-                    # Handle the case for non-Excel files if necessary
                     pass
 
-                # After processing, redirect to summary
+                file_dir, file_name = os.path.split(file_path)
+                file_root, _ = os.path.splitext(file_name)
+                temp_file_path = os.path.join(file_dir, f"TEMP_{file_root}.csv")
+                
+                save_dataframe(df_orig, temp_file_path, file_format='csv')
+                df_orig = load_dataframe_from_file(temp_file_path)
+                html_table = dataframe_to_html(df_orig,classes='table table-striped preserve-whitespace')
+                request.session['html_table'] = html_table
+                request.session['temp_file_path'] = temp_file_path
+                print(f"file path after saving dataframe: {file_path}")
+                request.session.save()
                 return redirect('summary')
+                
         elif 'merged_cell_action' in request.POST:
             file_path = request.session.get('temp_file_path')
             merged_cell_action = request.POST.get('merged_cell_action')
 
             if file_path and file_path.endswith(('.xlsx', '.xls')):
-                workbook = load_workbook(file_path)
+                workbook = load_workbook(file_path, data_only=True)
                 sheet = workbook.active
 
                 if merged_cell_action == 'first_cell':
@@ -139,11 +147,21 @@ def main_page(request):
                 elif merged_cell_action == 'delete_rows':
                     delete_rows_with_merged_cells(sheet)
 
-                # Save the processed df and redirect
-                temp_file_path = os.path.join(os.path.dirname(file_path), 'processed.xlsx')
-                workbook.save(temp_file_path)
+                df_orig = pd.DataFrame(sheet.values)
+                # Set the first row as headers if necessary
+                df_orig.columns = df_orig.iloc[0]
+                df_orig = df_orig[1:]
+                file_dir, file_name = os.path.split(file_path)
+                file_root, _ = os.path.splitext(file_name)
+                temp_file_path = os.path.join(file_dir, f"TEMP_{file_root}.csv")
+                
+                save_dataframe(df_orig, temp_file_path, file_format='csv')
+                df_orig = load_dataframe_from_file(temp_file_path)
+                html_table = dataframe_to_html(df_orig,classes='table table-striped preserve-whitespace')
+                request.session['html_table'] = html_table
                 request.session['temp_file_path'] = temp_file_path
-
+                print(f"file path after saving dataframe: {file_path}")
+                request.session.save()
                 return redirect('summary')
 
     else:
@@ -237,7 +255,7 @@ def summary(request):
                 else:
                     num_rows_to_delete_start = 0
                 if num_rows_to_delete_start > 0:
-                    result = handle_delete_first_x_rows(df_v1, num_rows_to_delete_end)
+                    result = handle_delete_first_x_rows(df_v1, num_rows_to_delete_start)
                     df_v1 = result['dataframe']
                     rows_deleted = result['rows_deleted']
                     messages.success(request, f'First {rows_deleted} rows deleted successfully.')
