@@ -142,48 +142,51 @@ document.addEventListener("DOMContentLoaded", function () {
   // });
 
   ///////////// undo functionality /////////////
-  let undoButton = document.getElementById("undo-button");
-  if (undoButton) {
-    undoButton.addEventListener("click", async function (event) {
-      event.preventDefault();
-      console.log("Undo button clicked!");
+  // let undoButton = document.getElementById("undo-button");
+  // if (undoButton) {
+  //   undoButton.addEventListener("click", async function (event) {
+  //     event.preventDefault();
+  //     console.log("Undo button clicked!");
 
-      try {
-        let response = await fetch("/undo/", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-CSRFToken": csrfToken,
-          },
-          body: JSON.stringify({
-            session_key: sessionKey,
-          }),
-        });
+  //     try {
+  //       let response = await fetch("/undo/", {
+  //         method: "POST",
+  //         headers: {
+  //           "Content-Type": "application/json",
+  //           "X-CSRFToken": csrfToken,
+  //         },
+  //         body: JSON.stringify({
+  //           session_key: sessionKey,
+  //         }),
+  //       });
+  //       let text = await response.text();
 
-        if (!response.ok) {
-          throw new Error(
-            "Network response was not ok: " + response.statusText
-          );
-        }
+  //       console.log(text);
 
-        let data = await response.json();
-        if (data.status === "success") {
-          // Update the table with the new HTML
-          document.getElementById("summary-table").innerHTML =
-            data.updated_table;
-        } else {
-          console.error("Error from server:", data.error);
-        }
-      } catch (error) {
-        console.error(
-          "There was a problem with the fetch operation:",
-          error.message
-        );
-      }
-    });
-  } else {
-    console.error("Undo button not found!");
-  }
+  //       if (!response.ok) {
+  //         throw new Error(
+  //           "Network response was not ok: " + response.statusText
+  //         );
+  //       }
+
+  //       let data = await response.json();
+  //       if (data.status === "success") {
+  //         // Update the table with the new HTML
+  //         document.getElementById("summary-table").innerHTML =
+  //           data.updated_table;
+  //       } else {
+  //         console.error("Error from server:", data.error);
+  //       }
+  //     } catch (error) {
+  //       console.error(
+  //         "There was a problem with the fetch operation:",
+  //         error.message
+  //       );
+  //     }
+  //   });
+  // } else {
+  //   console.error("Undo button not found!");
+  // }
 
   //////////// undo table autorefresh V2 :(
 

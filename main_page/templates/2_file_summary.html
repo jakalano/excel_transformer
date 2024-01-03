@@ -188,6 +188,14 @@
 </div>
 {% endif %}
 </div>
+<!-- Undo Button Form -->
+<form action="{% url 'undo_last_action' %}" method="post">
+    {% csrf_token %}
+    <div class="text-center mt-4">
+        <input type="hidden" name="current_view" value="summary">
+        <button type="submit" class="btn btn-warning">Undo</button>
+    </div>
+</form>
 
 <!-- Data Table Display -->
 <div class="container-fluid px-0"> 

@@ -133,12 +133,24 @@ def save_as_template(user, actions, template_name):
     return template
 
 def get_actions_for_session(session_key, uploaded_file, exclude_last_action=False):
+    print(f"Retrieving actions for session: {session_key}, uploaded file: {uploaded_file}")
 
-    actions = Action.objects.filter(session_id=session_key, uploaded_file=uploaded_file)
+    # Filter out actions that are already undone
+    actions = Action.objects.filter(session_id=session_key, uploaded_file=uploaded_file, undone=False)
+    print(f"Initial actions found: {actions}")
+
     if exclude_last_action and actions.exists():
+        # Get the last action that has not been undone
         last_action = actions.latest('timestamp')
+        print(f"Excluding last action: {last_action}")
         actions = actions.exclude(id=last_action.id)
+    else:
+        print("Not excluding last action.")
+
+    print(f"Final actions returned: {actions}")
     return actions
+
+
 
 def action_to_dict(action):
 

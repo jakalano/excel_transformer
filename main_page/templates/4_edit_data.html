@@ -203,7 +203,16 @@
 </div>
 
 
+<!-- Undo Button Form -->
+<form action="{% url 'undo_last_action' %}" method="post">
+  {% csrf_token %}
+  <div class="text-center mt-4">
+    <input type="hidden" name="current_view" value="edit_data">
+      <button type="submit" class="btn btn-warning">Undo</button>
+  </div>
+</form>
 
+<br>
   <div class="container-fluid px-0">
     <div class="card m-0">
       <div class="card-body p-0">

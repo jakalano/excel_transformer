@@ -18,7 +18,11 @@
     />
 
     <link rel="stylesheet" type="text/css" href="{% static 'custom.css' %}" />
-   
+    <script>
+      var csrfToken = '{{ csrf_token }}';
+      var sessionKey = '{{ request.session.session_key }}';
+  </script>
+  
   
     <title>Excel file transformer</title>
   </head>

@@ -184,13 +184,15 @@
 </div>
 
 
-  <!-- Undo Button -->
-  <div class="row">
-    <div class="col-12">
-      <button id="undo-button" class="btn btn-warning">Undo</button>
-    </div>
+<!-- Undo Button Form -->
+<form action="{% url 'undo_last_action' %}" method="post">
+  {% csrf_token %}
+  <div class="text-center mt-4">
+    <input type="hidden" name="current_view" value="edit_columns">
+      <button type="submit" class="btn btn-warning">Undo</button>
   </div>
-<br>
+</form>
+
 <!-- Data Table Display -->
 <div class="container-fluid px-0"> 
   <div class="card m-0">

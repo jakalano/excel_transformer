@@ -106,7 +106,7 @@ def main_page(request):
                         # Load the selected sheet
                         df_orig = pd.read_excel(xls, sheet_name=selected_sheet)
 
-                    # Process the DataFrame as required
+                    # Process the df as required
                     # For example, saving it as a CSV for further processing
                     temp_file_dir, file_name = os.path.split(file_path)
                     file_root, _ = os.path.splitext(file_name)
@@ -139,7 +139,7 @@ def main_page(request):
                 elif merged_cell_action == 'delete_rows':
                     delete_rows_with_merged_cells(sheet)
 
-                # Save the processed DataFrame and redirect
+                # Save the processed df and redirect
                 temp_file_path = os.path.join(os.path.dirname(file_path), 'processed.xlsx')
                 workbook.save(temp_file_path)
                 request.session['temp_file_path'] = temp_file_path
@@ -323,9 +323,9 @@ def summary(request):
                         parameters = action['parameters']
                         df_original, error_message = apply_action(df_original, action_type, parameters)
                         if error_message:
-                            # If there's an error, display it and revert to the original DataFrame
+                            # If there's an error, display it and revert to the original df
                             messages.error(request, f"Error applying template: {error_message}")
-                            save_dataframe(df_original, temp_file_path)  # Save the original DataFrame
+                            save_dataframe(df_original, temp_file_path)  # Save the original df
                             return redirect('summary')
                     
                     df_v1 = df_original
@@ -510,7 +510,7 @@ def edit_columns(request):
             delete_original = 'delete_original_after_merge' in request.POST
 
             merge_result = merge_columns(df_v2, columns_to_merge, merge_separator, new_column_name, delete_original)
-            df_v2 = merge_result['dataframe']  # Update DataFrame
+            df_v2 = merge_result['dataframe']  # Update df
             used_column_name = merge_result['new_column_name']  # Extract the new column name
 
             merge_message = f'Columns {", ".join(columns_to_merge)} merged into "{used_column_name}" successfully.'
@@ -1001,56 +1001,93 @@ def delete_rows_with_merged_cells(sheet):
 
 def undo_last_action(request):
     print("Undo view accessed")
+    # determine the current view based on the request path, default to summary
+    current_view = request.POST.get('current_view', 'summary')
     original_file_path = request.session.get('file_path')
 
     if original_file_path is None:
         print("Original file path is None!")
         return JsonResponse({'status': 'error', 'error': 'Original file path not found'}, status=500)
 
+    print(f"Original file path: {original_file_path}")
+
     # Extract the relative path using MEDIA_ROOT
     relative_path = os.path.relpath(original_file_path, settings.MEDIA_ROOT).replace('\\', '/')
+    print(f"Relative path: {relative_path}")
 
     try:
         current_file = UploadedFile.objects.get(file=relative_path)
+        print("UploadedFile instance found:", current_file)
     except UploadedFile.DoesNotExist:
+        print("UploadedFile instance not found.")
         messages.error(request, "The file you're working on could not be found.")
         return redirect('main_page')
 
     # Retrieve the df from the file
     df = load_dataframe_from_file(original_file_path)
+    print("DataFrame loaded from file.")
 
-    # uses utils.py function to get actions
-    actions = get_actions_for_session(request.session.session_key, current_file, exclude_last_action=True)
-    
+    # Retrieve actions that are not undone yet
+    actions = get_actions_for_session(request.session.session_key, current_file, exclude_last_action=False)
+    print(f"Actions retrieved: {actions}")
+
     if actions.exists():
-        # Set the undone flag to True for the last action
-        last_action = Action.objects.filter(session_id=request.session.session_key, uploaded_file=current_file).latest('timestamp')
-        last_action.undone = True
-        last_action.save()
+        # Mark the last action as undone
+        last_action = actions.latest('timestamp')
+
+        action_failed = False
+
 
         # Apply the actions
         for action in actions:
-            df, current_view = apply_action(df, action.action_type, action.parameters, is_undo=True)
-            if current_view is None:
+            try:
+                # Skip applying the last action which is just marked as undone
+                if action.id == last_action.id:
+                    continue
+                df, current_view = apply_action(df, action.action_type, action.parameters, is_undo=True)
+                print(f"Applied action: {action.action_type}, Current view: {current_view}")
+                if current_view is None:
+                    break
+            except Exception as e:
+                messages.error(request, f"An error occurred while undoing the last action: {str(e)}")
+                action_failed = True
                 break
+        
+        if not action_failed and last_action:
+        # Mark the last action as undone only if no errors occurred in applying actions
+            last_action.undone = True
+            last_action.save()
+            print("Last action marked as undone.")
+        # Retrieve action name and parameters
+        action_name = last_action.action_type.replace('_', ' ').capitalize()
+        action_params = last_action.parameters if last_action.parameters else {}
 
+        # Format parameters for display
+        formatted_params = ', '.join([f'{key}: {value}' for key, value in action_params.items()])
+        message = f"Successfully undone action: '{action_name}' with parameters ({formatted_params})."
+        messages.success(request, message)
     else:
-        current_view = None
+        messages.info(request, "No more actions to undo.")
+        print("No actions to undo.")
+        return redirect(current_view)
 
     # Check if current_view is not None before redirecting
     if current_view is not None:
-        # Save the modified DataFrame back to the temporary file path
+        # save the modified df back to the temporary file path
         temp_file_path = request.session.get('temp_file_path')
         save_dataframe(df, temp_file_path)
+        print("DataFrame saved, redirecting to current view:", current_view)
         return redirect(current_view)
     else:
+        print("An error occurred while undoing the last action.")
         messages.error(request, "An error occurred while undoing the last action.")
-        return redirect('summary')
+        return redirect(current_view)
+
 
 def apply_action(df, action_type, parameters, is_undo=False):
     try:
         print(f"Applying {action_type} with {parameters}")
-        # Print initial state of DataFrame
+        # Print initial state of df
         print("DataFrame before action:", df.head())
         current_view = None  # Variable to hold the current view name
 
@@ -1113,9 +1150,10 @@ def apply_action(df, action_type, parameters, is_undo=False):
                 column_to_split = parameters.get('column_to_split')
                 split_value = parameters.get('split_value')
                 delete_original = parameters.get('delete_original')
+                ignore_repeated = parameters.get('ignore_repeated', False)
                 if column_to_split in df.columns and split_value:
                     # performs the split operation
-                    df = split_column(df, column_to_split, split_value, delete_original)
+                    df = split_column(df, column_to_split, split_value, delete_original, ignore_repeated)
 
                 
 
@@ -1190,12 +1228,14 @@ def apply_action(df, action_type, parameters, is_undo=False):
 
         else:
             print(f"Unknown action type: {action_type}")
+            return df, None
+        
         print(f"DataFrame after applying {action_type}:", df.head())
-        return df, None
+        return df, current_view
     
     except Exception as e:
         print(f"Error applying action {action_type} with parameters {parameters}: {str(e)}")
-        return df, str(e)  # Return the DataFrame and the error message
+        return df, str(e)  # Return the df and the error message
 
 @login_required(login_url="/login/")
 def save_template(request):
@@ -1204,8 +1244,8 @@ def save_template(request):
         relative_path = os.path.relpath(original_file_path, settings.MEDIA_ROOT).replace('\\', '/')
         try:
             current_file = UploadedFile.objects.get(file=relative_path)
-            df = load_dataframe_from_file(original_file_path)  # Assuming this function returns a pandas DataFrame
-            original_headers = df.columns.tolist()  # Extract headers from the DataFrame
+            df = load_dataframe_from_file(original_file_path)  # Assuming this function returns a pandas df
+            original_headers = df.columns.tolist()  # Extract headers from the df
 
             actions = get_actions_for_session(request.session.session_key, current_file)
             actions_data = [action_to_dict(action) for action in actions if not action.undone]  # Convert actions to a dict representation
