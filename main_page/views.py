@@ -314,6 +314,7 @@ def summary(request):
             try:
                 template = Template.objects.get(id=template_id, user=request.user)
                 df_original = load_dataframe_from_file(temp_file_path)
+                df_original_backup = df_original.copy(deep=True)  # create a deep copy for reverting changes on failure
                 print("Template Actions:", template.actions)
                 current_headers = df_original.columns.tolist()
                 #print(f"current headers: {current_headers}, original headers: {template.original_headers}")
@@ -341,7 +342,8 @@ def summary(request):
                         if error_message:
                             # if there's an error, displays it and reverts to the original df
                             messages.error(request, f"Error applying template: {error_message}")
-                            save_dataframe(df_original, temp_file_path)  # saves the original df
+                            df_original = df_original_backup  # Revert to the actual original state
+                            save_dataframe(df_original_backup, temp_file_path)  # saves the original df
                             return redirect('summary')
                     
                     df_v1 = df_original
