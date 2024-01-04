@@ -34,7 +34,7 @@ def load_dataframe_from_file(file_path):
     
 def save_dataframe(data, save_path, file_format=None):
 
-    # Check if data is a dictionary and extract DataFrame if necessary
+    # check if data is a dictionary and extract DataFrame if necessary
     if isinstance(data, dict) and 'dataframe' in data:
         df = data['dataframe']
     elif isinstance(data, pd.DataFrame):
@@ -43,20 +43,20 @@ def save_dataframe(data, save_path, file_format=None):
         raise ValueError("Invalid data type for saving. Expected a DataFrame or a dictionary containing a DataFrame.")
 
 
-    # Infer file format from save_path if not provided
+    # get file format from save_path if not provided
     if file_format is None:
         _, file_format = os.path.splitext(save_path)
         file_format = file_format.lstrip('.')
     
-    # Ensure file has correct extension
+    # ensure file has correct extension
     if not save_path.endswith(f'.{file_format}'):
         save_path = f'{save_path}.{file_format}'
 
-    # Ensure directory exists
+    # ensure dir exists
     save_dir = os.path.dirname(save_path)
     os.makedirs(save_dir, exist_ok=True)
 
-    # Save the DataFrame in the specified format
+    # save the df in the specified format
     if file_format == 'csv':
         df.to_csv(save_path, index=False)
     elif file_format == 'xlsx':
@@ -76,10 +76,10 @@ def save_dataframe(data, save_path, file_format=None):
 def sanitize_column_names(df):
     """Sanitize column names to make them valid XML tag names."""
     def valid_xml_tag(col):
-        # Replace invalid characters with underscore
-        # Allow alphanumeric characters, including non-standard letters
+        # replace invalid characters with underscore
+        # allow alphanumeric characters, including non-standard letters
         col = re.sub(r'[^\w]', '_', col, flags=re.UNICODE)
-        # Prefix with 'col_' if the column name starts with a digit
+        # prefix with 'col_' if the column name starts with a digit
         if col[0].isdigit():
             col = 'col_' + col
         return col
@@ -91,20 +91,20 @@ def dataframe_to_html(df, classes=None):
 
     df.columns = [col for col, dtype in zip(df.columns, df.dtypes)]
 
-    # Convert NaN values to an empty string and convert DataFrame to HTML
+    # convert NaN values to an empty string and convert df to HTML
     return df.fillna('').to_html(classes=classes, escape=False)
 
 
 
 def record_action(uploaded_file, action_type, parameters, user, session_id, df_backup=None):
 
-    # Check if the user is authenticated
+    # check if the user is authenticated
     if user.is_authenticated:
         user_instance = user
     else:
         user_instance = None  
 
-    # Fetch the UploadedFile instance
+    # fetch the UploadedFile instance
     uploaded_file_instance = UploadedFile.objects.get(file=uploaded_file)
 
 
@@ -116,11 +116,11 @@ def record_action(uploaded_file, action_type, parameters, user, session_id, df_b
         session_id=session_id,
     )
 
-    # If there's a backup DataFrame, store it
+    # if there's a backup df, store it
     if df_backup is not None:
-        backup_path = f'backups/{action.id}_backup.csv'  # Define a path for backup
+        backup_path = f'backups/{action.id}_backup.csv'  # define a path for backup
         df_backup.to_csv(backup_path)
-        action.backup_data_path = backup_path  # Assuming Action model has a field for this
+        action.backup_data_path = backup_path
         action.save()
 
     return action
@@ -135,12 +135,12 @@ def save_as_template(user, actions, template_name):
 def get_actions_for_session(session_key, uploaded_file, exclude_last_action=False):
     print(f"Retrieving actions for session: {session_key}, uploaded file: {uploaded_file}")
 
-    # Filter out actions that are already undone
+    # filter out actions that are already undone
     actions = Action.objects.filter(session_id=session_key, uploaded_file=uploaded_file, undone=False)
     print(f"Initial actions found: {actions}")
 
     if exclude_last_action and actions.exists():
-        # Get the last action that has not been undone
+        # get the last action that has not been undone
         last_action = actions.latest('timestamp')
         print(f"Excluding last action: {last_action}")
         actions = actions.exclude(id=last_action.id)
@@ -157,7 +157,7 @@ def action_to_dict(action):
     return {
         'action_type': action.action_type,
         'parameters': action.parameters,
-        'timestamp': action.timestamp.isoformat(),  # Convert datetime to string
+        'timestamp': action.timestamp.isoformat(),  # convert datetime to string
     }
 
 ################## summary view actions ###################
@@ -234,7 +234,7 @@ def split_column(df, column_to_split, split_value, delete_original, ignore_repea
     temp_column = column_to_split + "_temp"
 
     if ignore_repeated:
-        # Use a temporary column to handle repeated split values
+        # use a temp column to handle repeated split values
         df[temp_column] = df[column_to_split].str.replace(f'{split_value}+', split_value, regex=True)
     else:
         df[temp_column] = df[column_to_split]
@@ -244,7 +244,7 @@ def split_column(df, column_to_split, split_value, delete_original, ignore_repea
         new_column_name = f"{column_to_split}_split_{i+1}"
         df[new_column_name] = split_data[new_column]
 
-    # Clean up: remove the temporary column and optionally the original column
+    # clean up: remove the temp column and optionally the original column
     df.drop(columns=[temp_column], inplace=True)
     if delete_original:
         df.drop(columns=[column_to_split], inplace=True)
@@ -253,7 +253,7 @@ def split_column(df, column_to_split, split_value, delete_original, ignore_repea
 
 def merge_columns(df, columns_to_merge, merge_separator, new_column_name, delete_original):
     if not new_column_name:
-        # Use a counter to create a unique name
+        # use a counter to create a unique name
         existing_columns = [col for col in df.columns if col.startswith('merged_column_')]
         new_column_index = len(existing_columns) + 1
         new_column_name = f'merged_column_{new_column_index}'
@@ -279,26 +279,26 @@ def delete_data(df, columns_to_modify, delimiter, delete_option, include_delimit
             column_series = df[column].fillna('').astype(str)
             try:
                 if case_sensitive:
-                    # Case Sensitive: Use the provided delimiter as is
+                    # case sensitive: use the provided delimiter as is
                     pattern = re.escape(delimiter)
                 else:
-                    # Case Insensitive: Use re.IGNORECASE flag
+                    # case insensitive: use re.IGNORECASE flag
                     pattern = '(?i)' + re.escape(delimiter)
 
                 if include_delimiter:
                     if delete_option == 'before':
-                        # Deletes everything before the delimiter, including the delimiter itself
+                        # deletes everything before the delimiter, including the delimiter itself
                         df[column] = column_series.apply(lambda x: ''.join(re.split(pattern, x)[1:]) if re.search(pattern, x) else x)
                     elif delete_option == 'after':
-                        # Deletes everything after the delimiter and the delimiter itself
+                        # deletes everything after the delimiter and the delimiter itself
                         df[column] = column_series.apply(lambda x: re.split(pattern, x, 1)[0] if re.search(pattern, x) else x)
                 else:
                     if delete_option == 'before':
-                        # Deletes everything before the delimiter but leaves the delimiter alone
+                        # deletes everything before the delimiter but leaves the delimiter alone
                         df[column] = column_series.apply(lambda x: delimiter + ''.join(re.split(pattern, x)[1:]) if re.search(pattern, x) else x)
 
                     elif delete_option == 'after':
-                        # Deletes everything after the delimiter but leaves the delimiter alone
+                        # deletes everything after the delimiter but leaves the delimiter alone
                         df[column] = column_series.apply(lambda x: re.split(pattern, x, 1)[0] + delimiter if re.search(pattern, x) else x)
 
 
@@ -325,18 +325,17 @@ def replace_symbol(df, columns_to_replace, old_symbol, new_symbol, case_sensitiv
     return df
 
 def trim_and_replace_multiple_whitespaces(df, columns_to_modify=None, replace_all=False):
-    # If replace_all is True, set columns_to_modify to all columns.
+    # if replace_all is True, set columns_to_modify to all columns.
     if replace_all:
         columns_to_modify = df.columns.tolist()
     elif not columns_to_modify:
-        # If columns_to_modify is None or empty, modify all columns
+        # if columns_to_modify is None or empty, modify all columns
         columns_to_modify = df.columns.tolist()
     
-    # Apply the whitespace modifications.
     for column in columns_to_modify:
         if column in df.columns:
             try:
-            # Use regex to replace multiple spaces with a single space and strip leading/trailing spaces.
+            # uses regex to replace multiple spaces with a single space and strip leading/trailing spaces.
                 df[column] = df[column].astype(str).apply(lambda x: re.sub(r'\s+', ' ', x).strip())
             except Exception as e:
                 print(f"Error processing column {column}: {e}")

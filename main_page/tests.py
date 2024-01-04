@@ -12,7 +12,7 @@ import json
 
 class SummaryViewTest(TestCase):
     def setUp(self):
-        # Configure logging
+        # configures logging
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
 
@@ -33,12 +33,12 @@ class SummaryViewTest(TestCase):
     @patch('main_page.models.Action.objects.create')
     def test_remove_empty_rows(self, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
         self.logger.info("Testing removal of empty rows")
-        # Create a df with some empty rows
+        # creates a df with some empty rows
         df = pd.DataFrame({'A': [1, np.nan, 3], 'B': [4, np.nan, np.nan]})
         print("Original DataFrame before removing empty rows:", df)
         mock_load_df.return_value = df
         mock_get_uploaded_file.return_value = UploadedFile(file='media/_TEST_20231223233536/TEMP__TEST.csv')
-        mock_save_df.side_effect = lambda df, path: path  # Mocks saving and returns path
+        mock_save_df.side_effect = lambda df, path: path  # mocks saving and returns path
 
         url = reverse('summary')
         response = self.client.post(url, {
@@ -46,12 +46,12 @@ class SummaryViewTest(TestCase):
         })
 
         updated_df = mock_save_df.call_args[0][0]
-        # Check that the empty row has been removed
+        # checks that the empty row has been removed
         print("Updated DataFrame after removing empty rows:", updated_df)
 
         self.assertEqual(len(updated_df), 2)
         self.assertFalse(updated_df.isna().all(axis=1).any())
-        self.assertEqual(response.status_code, 302)  # Assuming redirect after operation
+        self.assertEqual(response.status_code, 302)  # assuming redirect after operation
         self.logger.debug(f"Response status code: {response.status_code}")
         self.logger.debug(f"Updated DataFrame: {updated_df}")
 
@@ -60,22 +60,22 @@ class SummaryViewTest(TestCase):
     @patch('main_page.views.UploadedFile.objects.get')
     @patch('main_page.models.Action.objects.create')
     def test_remove_empty_columns(self, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
-        # Create a df with some empty columns
+        # creates a df with some empty columns
         df = pd.DataFrame({'A': [1, 2, 3], 'B': [np.nan, np.nan, np.nan], 'C': [4, 5, 6]})
         print("Original DataFrame before removing empty columns:", df)
         mock_load_df.return_value = df
         mock_get_uploaded_file.return_value = UploadedFile(file='media/_TEST_20231223233536/TEMP__TEST.csv')
-        mock_save_df.side_effect = lambda df, path: path  # Mocks saving and returns path
+        mock_save_df.side_effect = lambda df, path: path  # mocks saving and returns path
 
         url = reverse('summary')
         response = self.client.post(url, {
-            'remove_empty_cols': ['B']  # Assuming 'B' is the name of the empty column
+            'remove_empty_cols': ['B']  # assuming 'B' is the name of the empty column
         })
 
         updated_df = mock_save_df.call_args[0][0]
         print("Updated DataFrame after removing empty columns:", updated_df)
 
-        self.assertNotIn('B', updated_df.columns)  # Check that column 'B' has been removed
+        self.assertNotIn('B', updated_df.columns)  # checks that column 'B' has been removed
         self.assertEqual(response.status_code, 302)
 
     @patch('main_page.views.load_dataframe_from_file')
@@ -87,16 +87,16 @@ class SummaryViewTest(TestCase):
         print("Original DataFrame before deleting first 3 rows:", df)
         mock_load_df.return_value = df
         mock_get_uploaded_file.return_value = UploadedFile(file='media/_TEST_20231223233536/TEMP__TEST.csv')
-        mock_save_df.side_effect = lambda df, path: path  # Mocks saving and returns path
+        mock_save_df.side_effect = lambda df, path: path  # mocks saving and returns path
 
         url = reverse('summary')
         response = self.client.post(url, {
-            'num_rows_to_delete_start': '3'  # Assuming we want to delete the first 3 rows
+            'num_rows_to_delete_start': '3'  # assuming we want to delete the first 3 rows
         })
 
         updated_df = mock_save_df.call_args[0][0]
         print("Updated DataFrame after deleting first 3 rows:", updated_df)
-        self.assertEqual(len(updated_df), 7)  # Check that 3 rows have been removed
+        self.assertEqual(len(updated_df), 7)  # checks that 3 rows have been removed
         self.assertEqual(response.status_code, 302)
 
     @patch('main_page.views.load_dataframe_from_file')
@@ -108,16 +108,16 @@ class SummaryViewTest(TestCase):
         print("Original DataFrame before deleting last 2 rows:", df)
         mock_load_df.return_value = df
         mock_get_uploaded_file.return_value = UploadedFile(file='media/_TEST_20231223233536/TEMP__TEST.csv')
-        mock_save_df.side_effect = lambda df, path: path  # Mocks saving and returns path
+        mock_save_df.side_effect = lambda df, path: path  # mocks saving and returns path
 
         url = reverse('summary')
         response = self.client.post(url, {
-            'num_rows_to_delete_end': '2'  # Assuming we want to delete the last 2 rows
+            'num_rows_to_delete_end': '2'  # assuming we want to delete the last 2 rows
         })
 
         updated_df = mock_save_df.call_args[0][0]
         print("Updated DataFrame after deleting last 2 rows:", updated_df)
-        self.assertEqual(len(updated_df), 8)  # Check that 2 rows have been removed
+        self.assertEqual(len(updated_df), 8)  # checks that 2 rows have been removed
         self.assertEqual(response.status_code, 302)
 
 
@@ -125,7 +125,7 @@ class SummaryViewTest(TestCase):
 class EditColumnsViewTest(TestCase):
     def setUp(self):
         self.client = Client()
-        # Create a test user and log in
+        # creates a test user and losg in
         self.user = User.objects.create_user('testuser', 'test@example.com', 'password')
         self.client.login(username='testuser', password='password')
 
@@ -137,14 +137,14 @@ class EditColumnsViewTest(TestCase):
     @patch('main_page.views.load_dataframe_from_file')
     @patch('main_page.views.save_dataframe')
     @patch('main_page.views.UploadedFile.objects.get')
-    @patch('main_page.models.Action.objects.create')  # Mock the Action create method
+    @patch('main_page.models.Action.objects.create')  # mocks the Action create method
     def test_add_column(self, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
         df = pd.DataFrame({'existing_column': [1, 2, 3]})
         print("Original DataFrame columns:", df.columns.tolist())
         mock_load_df.return_value = df
         mock_get_uploaded_file.return_value = UploadedFile(file='media/_TEST_20231223233536/TEMP__TEST.csv')
 
-        # Prevent the Action create method from attempting to save
+        # prevents the Action create method from attempting to save
         mock_action_create.return_value = MagicMock(spec=Action)
 
         url = reverse('edit_columns')
@@ -313,18 +313,18 @@ class EditDataViewTest(TestCase):
     @patch('main_page.views.UploadedFile.objects.get')
     @patch('main_page.models.Action.objects.create')
     def test_delete_data(self, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
-        # Setup df
+        # sets up df
         df = pd.DataFrame({'A': ['text1', 'text2', 'text3'], 'B': ['moretext1', 'moretext2', 'moretext3']})
         print("Original DataFrame:", df)
         mock_load_df.return_value = df
         mock_get_uploaded_file.return_value = UploadedFile(file='media/_TEST_20231223233536/TEMP__TEST.csv')
 
-        # Mock Action.objects.create to return an Action with a valid id
+        # mocks Action.objects.create to return an Action with a valid id
         action_mock = MagicMock(spec=Action)
-        action_mock.id = 123  # Assign a valid id
+        action_mock.id = 123  # assigns a valid id
         mock_action_create.return_value = action_mock
 
-        # Prepare the POST request
+        # prepares the POST request
         url = reverse('edit_data')
         response = self.client.post(url, {
             'action': 'delete_data',
@@ -402,8 +402,7 @@ class EditDataViewTest(TestCase):
     #         'ignore_whitespace': False
     #     })
 
-    #     # Assume that the validation process stores results in the session or a similar mechanism
-    #     # In this example, we're just checking for the presence of an error message
+
     #     self.assertIn('error', response.context)
 
     # @patch('main_page.views.load_dataframe_from_file')
@@ -422,8 +421,5 @@ class EditDataViewTest(TestCase):
     #         'columns_to_check_duplicates': ['A', 'B']
     #     })
 
-    #     # Check if the view correctly identifies duplicates
-    #     # This may involve checking the response context, session data, or a similar mechanism
-    #     # Here, we're just asserting a successful response
     #     self.assertEqual(response.status_code, 302)
     #     self.assertIn('duplicates', response.context)
