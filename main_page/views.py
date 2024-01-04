@@ -175,13 +175,14 @@ def summary(request):
     print("Entered summary view")
     temp_file_path = request.session.get('temp_file_path')
     file_path = request.session.get('file_path')
-    df_v1 = load_dataframe_from_file(temp_file_path)
+    
     print(f"file path in summary view: {file_path}")
     print(f"temp file path in summary view: {temp_file_path}")
         # checks if a file has been uploaded
     if not temp_file_path or not file_path:
         messages.error(request, "No file uploaded. Please upload a file to proceed.")
         return redirect('main_page')
+    df_v1 = load_dataframe_from_file(temp_file_path)
     # extracts the relative path using MEDIA_ROOT
     relative_path = os.path.relpath(file_path, settings.MEDIA_ROOT).replace('\\', '/')
     print(relative_path)
@@ -313,9 +314,9 @@ def summary(request):
             try:
                 template = Template.objects.get(id=template_id, user=request.user)
                 df_original = load_dataframe_from_file(temp_file_path)
-
+                print("Template Actions:", template.actions)
                 current_headers = df_original.columns.tolist()
-                print(f"current headers: {current_headers}, original headers: {template.original_headers}")
+                #print(f"current headers: {current_headers}, original headers: {template.original_headers}")
 
                 if set(current_headers) != set(template.original_headers):
                     header_mismatch = True
@@ -335,6 +336,7 @@ def summary(request):
                     for action in template.actions:
                         action_type = action['action_type']
                         parameters = action['parameters']
+                        print(f"Applying Action: {action_type} with Parameters: {parameters}")
                         df_original, error_message = apply_action(df_original, action_type, parameters)
                         if error_message:
                             # if there's an error, displays it and reverts to the original df
@@ -1083,6 +1085,7 @@ def apply_action(df, action_type, parameters, is_undo=False):
         print(f"Applying {action_type} with {parameters}")
         # prints initial state of df
         print("DataFrame before action:", df.head())
+        current_view = None
 
 
         if action_type == 'remove_empty_rows':
@@ -1111,7 +1114,7 @@ def apply_action(df, action_type, parameters, is_undo=False):
 
 
     
-        if action_type == 'add_column':
+        elif action_type == 'add_column':
             new_column_name = parameters.get('new_column_name')
             df = add_column(df, new_column_name)
             
@@ -1161,7 +1164,7 @@ def apply_action(df, action_type, parameters, is_undo=False):
 
 
         
-        if action_type == 'delete_data':
+        elif action_type == 'delete_data':
             if is_undo:
                 # checks if there is a backup available
                 backup_path = Action.backup_data_path
@@ -1209,10 +1212,10 @@ def apply_action(df, action_type, parameters, is_undo=False):
 
         else:
             print(f"Unknown action type: {action_type}")
-            return df
+            return df, f"Unknown action type: {action_type}"
         
         print(f"DataFrame after applying {action_type}:", df.head())
-        return df
+        return df, None
     
     except Exception as e:
         print(f"Error applying action {action_type} with parameters {parameters}: {str(e)}")
