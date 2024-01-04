@@ -339,6 +339,9 @@ def summary(request):
                         parameters = action['parameters']
                         print(f"Applying Action: {action_type} with Parameters: {parameters}")
                         df_original, error_message = apply_action(df_original, action_type, parameters)
+                        if action_type == 'replace_header': #save and load from file to get the correct headers for empty header values, rather than NaN
+                            save_dataframe(df_original, temp_file_path)
+                            df_original = load_dataframe_from_file(temp_file_path)
                         if error_message:
                             # if there's an error, displays it and reverts to the original df
                             messages.error(request, f"Error applying template: {error_message}")
