@@ -601,7 +601,7 @@ def edit_data(request):
     if request.method == 'POST':
         print("POST request received")
         action = request.POST.get('action')
-        print(f"Action received: {action}")  # prints the action value
+        print(f"Action received: {action}")  # prints the action value for debugging
 
         if action == 'delete_data':
             columns_to_modify = request.POST.getlist('columns_to_modify')
@@ -619,9 +619,9 @@ def edit_data(request):
                 messages.success(request, 'Data deleted successfully based on your criteria.')
             except ValueError as e:
                 messages.error(request, str(e))
-            df_backup = df_v3[columns_to_modify].copy()  # backups the original data
+            df_backup = df_v3[columns_to_modify].copy()  # backups the original data for undo
             record_action(
-                uploaded_file=uploaded_file_instance,        
+                uploaded_file=uploaded_file_instance,
                 action_type='delete_data',
                 parameters={
                     'columns_to_modify': columns_to_modify,
@@ -635,14 +635,11 @@ def edit_data(request):
                 df_backup=df_backup,
             )
 
-
-
         elif action == 'replace_symbol':
             columns_to_replace = request.POST.getlist('columns_to_replace')
             old_symbol = request.POST.get('old_symbol')
             new_symbol = request.POST.get('new_symbol')
-            # defaults to False if the checkbox is not checked
-            case_sensitive = 'case_sensitive' in request.POST
+            case_sensitive = 'case_sensitive' in request.POST # defaults to False if the checkbox is not checked
             apply_to_all = '__all__' in columns_to_replace
 
             if apply_to_all:
@@ -654,9 +651,8 @@ def edit_data(request):
             except ValueError as e:
                 messages.error(request, str(e))
 
-           
             record_action(
-                uploaded_file=uploaded_file_instance,        
+                uploaded_file=uploaded_file_instance,
                 action_type='replace_symbol',
                 parameters={
                     'columns_to_replace': columns_to_replace if not apply_to_all else 'All Columns',
@@ -667,8 +663,6 @@ def edit_data(request):
                 user=request.user,
                 session_id=request.session.session_key,
             )
-
-            
 
         elif action == 'validate_data':
             columns_to_validate = request.POST.getlist('columns_to_validate')
@@ -724,7 +718,7 @@ def edit_data(request):
             print(f"Total invalid rows: {total_invalid_rows}")
             print("Invalid rows details:", invalid_rows)
 
-            # Constructing the message
+            # builds the return message
             if total_invalid_rows > 0:
                 invalid_message = f"Validation failed for {total_invalid_rows} rows. \n"
                 for column, rows in invalid_rows.items():
@@ -745,8 +739,7 @@ def edit_data(request):
                 duplicates = df_v3[df_v3.duplicated(subset=columns_to_check, keep=False)]
                 duplicates.sort_values(by=columns_to_check, inplace=True)
 
-
-                # constructs the duplicate message
+                # builds the duplicate message
                 if not duplicates.empty:
                     duplicate_rows = duplicates.index.tolist()
                     message = f"Found {len(duplicates)} duplicate rows: {', '.join(map(str, duplicate_rows))}."
@@ -799,10 +792,6 @@ def edit_data(request):
                 session_id=request.session.session_key
             )
 
-
-
-       
-
         save_dataframe(df_v3, temp_file_path)
         return redirect('edit_data')
     
@@ -813,7 +802,6 @@ def edit_data(request):
         'table': dataframe_to_html(df_v3, classes='table table-striped preserve-whitespace'),
         'original_file_name': os.path.basename(file_path),
         'df_v3': df_v3,
-        'duplicates_json': request.session.get('duplicates_json', '[]'),  # pass the duplicates as JSON
     }
     
     return render(request, '4_edit_data.html', context)

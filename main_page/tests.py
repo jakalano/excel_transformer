@@ -315,7 +315,7 @@ class EditDataViewTest(TestCase):
     def test_delete_data(self, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
         # sets up df
         df = pd.DataFrame({'A': ['text1', 'text2', 'text3'], 'B': ['moretext1', 'moretext2', 'moretext3']})
-        print("Original DataFrame:", df)
+        print("Original DataFrame before deleting data: ", df)
         mock_load_df.return_value = df
         mock_get_uploaded_file.return_value = UploadedFile(file='media/_TEST_20231223233536/TEMP__TEST.csv')
 
@@ -345,7 +345,8 @@ class EditDataViewTest(TestCase):
     @patch('main_page.views.UploadedFile.objects.get')
     @patch('main_page.models.Action.objects.create')
     def test_trim_and_replace_whitespaces(self, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
-        df = pd.DataFrame({'A': ['  text  with   spaces  ', '  another   text  ']})
+        df = pd.DataFrame({'A': ['  text  with   spaces', 'another   text  ']})
+        print("Original DataFrame before trimming whitespaces: ", df)
         mock_load_df.return_value = df
         mock_get_uploaded_file.return_value = UploadedFile(file='media/_TEST_20231223233536/TEMP__TEST.csv')
         mock_save_df.side_effect = lambda df, path: path
@@ -357,6 +358,7 @@ class EditDataViewTest(TestCase):
         })
 
         updated_df = mock_save_df.call_args[0][0]
+        print("Updated DataFrame after trimming whitespaces: ", updated_df)
         expected_output = ['text with spaces', 'another text']
         self.assertListEqual(updated_df['A'].tolist(), expected_output)
         self.assertEqual(response.status_code, 302)
@@ -367,6 +369,7 @@ class EditDataViewTest(TestCase):
     @patch('main_page.models.Action.objects.create')
     def test_change_case(self, mock_action_create, mock_get_uploaded_file, mock_save_df, mock_load_df):
         df = pd.DataFrame({'A': ['text', 'another text']})
+        print("Original DataFrame before changing case: ", df)
         mock_load_df.return_value = df
         mock_get_uploaded_file.return_value = UploadedFile(file='media/_TEST_20231223233536/TEMP__TEST.csv')
         mock_save_df.side_effect = lambda df, path: path
@@ -379,6 +382,7 @@ class EditDataViewTest(TestCase):
         })
 
         updated_df = mock_save_df.call_args[0][0]
+        print("Updated DataFrame after changing case: ", updated_df)
         expected_output = ['TEXT', 'ANOTHER TEXT']
         self.assertListEqual(updated_df['A'].tolist(), expected_output)
         self.assertEqual(response.status_code, 302)
