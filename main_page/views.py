@@ -29,6 +29,7 @@ import re
 import json
 import openpyxl
 from openpyxl import load_workbook
+import numpy as np
 
 
 def main_page(request):
@@ -736,8 +737,12 @@ def edit_data(request):
                 if '__all__' in columns_to_check:
                     columns_to_check = df_v3.columns.tolist()
 
-                # Find duplicates based on the selected columns
-                duplicates = df_v3[df_v3.duplicated(subset=columns_to_check, keep=False)]
+                # temporarily replace NaN values with a placeholder otherwise empty cols will return false "no duplicates found" messages
+                nan_placeholder = "<NaN>"
+                df_temp = df_v3.fillna(nan_placeholder)
+
+                # find duplicates in the modified dataframe
+                duplicates = df_temp[df_temp.duplicated(subset=columns_to_check, keep=False)]
                 duplicates.sort_values(by=columns_to_check, inplace=True)
 
                 if not duplicates.empty:
@@ -746,12 +751,20 @@ def edit_data(request):
 
                     for _, group in duplicate_groups:
                         duplicate_rows = sorted(group.index.tolist())
-                        duplicate_message += f"Duplicates found in rows: {', '.join(map(str, duplicate_rows))}. "
+                        if duplicate_rows:  # Check if there are rows in the group
+                            duplicate_message += f"Duplicates found in rows: {', '.join(map(str, duplicate_rows))}. "
 
-                    message = f"Found duplicates based on columns {', '.join(columns_to_check)}:\n{duplicate_message}"
-                    messages.error(request, message)
+                    # revert NaN placeholder in the original dataframe
+                    df_v3.replace(nan_placeholder, np.nan, inplace=True)
+
+                    if duplicate_message:  # check if there's anything in the message
+                        message = f"Found duplicates based on columns {', '.join(columns_to_check)}: {duplicate_message}"
+                        messages.error(request, message)
+                    else:
+                        messages.success(request, "No duplicates found.")
                 else:
                     messages.success(request, "No duplicates found.")
+
 
 
 
