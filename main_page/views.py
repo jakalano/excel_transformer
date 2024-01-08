@@ -736,16 +736,23 @@ def edit_data(request):
                 if '__all__' in columns_to_check:
                     columns_to_check = df_v3.columns.tolist()
 
+                # Find duplicates based on the selected columns
                 duplicates = df_v3[df_v3.duplicated(subset=columns_to_check, keep=False)]
                 duplicates.sort_values(by=columns_to_check, inplace=True)
 
-                # builds the duplicate message
                 if not duplicates.empty:
-                    duplicate_rows = duplicates.index.tolist()
-                    message = f"Found {len(duplicates)} duplicate rows: {', '.join(map(str, duplicate_rows))}."
+                    duplicate_groups = duplicates.groupby(columns_to_check)
+                    duplicate_message = ""
+
+                    for _, group in duplicate_groups:
+                        duplicate_rows = sorted(group.index.tolist())
+                        duplicate_message += f"Duplicates found in rows: {', '.join(map(str, duplicate_rows))}. "
+
+                    message = f"Found duplicates based on columns {', '.join(columns_to_check)}:\n{duplicate_message}"
                     messages.error(request, message)
                 else:
                     messages.success(request, "No duplicates found.")
+
 
 
         elif action == 'trim_and_replace_whitespaces':
