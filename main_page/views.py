@@ -1035,8 +1035,14 @@ def undo_last_action(request):
                 # skips applying the last action
                 if action.id == last_action.id:
                     continue
-                df = apply_action(df, action.action_type, action.parameters, is_undo=True)
+                result, error = apply_action(df, action.action_type, action.parameters, action, is_undo=True)
+                if error:
+                    messages.error(request, f"Error applying action {action.action_type}: {error}")
+                    action_failed = True
+                    break
+                df = result  # update df with the returned DataFrame
                 print(f"Applied action: {action.action_type}, Current view: {current_view}")
+
             except Exception as e:
                 messages.error(request, f"An error occurred while undoing the last action: {str(e)}")
                 action_failed = True
@@ -1061,7 +1067,7 @@ def undo_last_action(request):
         return redirect(current_view)
 
     # checks if current_view is not None before redirecting
-    if current_view is not None:
+    if current_view is not None and not action_failed:
         # saves the modified df back to the temporary file path
         temp_file_path = request.session.get('temp_file_path')
         save_dataframe(df, temp_file_path)
@@ -1073,7 +1079,7 @@ def undo_last_action(request):
         return redirect(current_view)
 
 
-def apply_action(df, action_type, parameters, is_undo=False):
+def apply_action(df, action_type, parameters, action_instance=None, is_undo=False):
     try:
         print(f"Applying {action_type} with {parameters}")
         # prints initial state of df
@@ -1160,8 +1166,8 @@ def apply_action(df, action_type, parameters, is_undo=False):
         elif action_type == 'delete_data':
             if is_undo:
                 # checks if there is a backup available
-                backup_path = Action.backup_data_path
-                if backup_path:
+                if action_instance and action_instance.backup_data_path:
+                    backup_path = action_instance.backup_data_path
                     df_backup = pd.read_csv(backup_path)
                     # logic to restore the original data from df_backup
                     for column in df_backup.columns:
