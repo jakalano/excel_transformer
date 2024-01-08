@@ -752,7 +752,7 @@ def edit_data(request):
                     for _, group in duplicate_groups:
                         duplicate_rows = sorted(group.index.tolist())
                         if duplicate_rows:  # Check if there are rows in the group
-                            duplicate_message += f"Duplicates found in rows: {', '.join(map(str, duplicate_rows))}. "
+                            duplicate_message += f"\nDuplicates found in rows: {', '.join(map(str, duplicate_rows))}. "
 
                     # revert NaN placeholder in the original dataframe
                     df_v3.replace(nan_placeholder, np.nan, inplace=True)
